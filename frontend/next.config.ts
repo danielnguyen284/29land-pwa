@@ -13,6 +13,14 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   outputFileTracingRoot: process.cwd(),
   turbopack: {},
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://29land-backend:3001/api/:path*", // Proxy to backend container inside Dokploy
+      },
+    ];
+  },
 };
 
 export default withSerwist(nextConfig);
