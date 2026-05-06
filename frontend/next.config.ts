@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://29land-backend:3001/api/:path*", // Proxy to backend container inside Dokploy
+        destination: "http://backend:3001/api/:path*", // Proxy to backend container inside Dokploy
       },
     ];
   },
