@@ -250,9 +250,18 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
     const targetBuildingIds = queryBuildingIds ? buildingIds.filter(id => queryBuildingIds.includes(id)) : buildingIds;
 
     if (targetBuildingIds.length === 0) {
-      res.json({ aggregate: { totalRevenue: 0, totalExpense: 0, netProfit: 0, occupancyRate: 0, totalTenants: 0 }, chartData: [] });
+      res.json({ 
+        aggregate: { totalRevenue: 0, totalExpense: 0, netProfit: 0, occupancyRate: 0, totalTenants: 0 }, 
+        breakdown: { invoicesRevenue: 0, depositsRevenue: 0, refundExpenses: 0, maintenanceExpenses: 0 },
+        chartData: [] 
+      });
       return;
     }
+
+    let invoicesRevenue = 0;
+    let depositsRevenue = 0;
+    let refundExpenses = 0;
+    let maintenanceExpenses = 0;
 
     // Generate month buckets between start and end
     const chartDataMap = new Map<string, { period: string; revenue: number; expense: number; profit: number }>();
@@ -286,6 +295,7 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
       const bucket = chartDataMap.get(monthStr);
       if (bucket) {
         bucket.revenue += Number(inv.paid_amount);
+        invoicesRevenue += Number(inv.paid_amount);
       }
     });
 
@@ -303,6 +313,7 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
       const bucket = chartDataMap.get(monthStr);
       if (bucket) {
         bucket.revenue += Number(c.deposit_amount);
+        depositsRevenue += Number(c.deposit_amount);
       }
     });
 
@@ -322,6 +333,7 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
         const bucket = chartDataMap.get(monthStr);
         if (bucket) {
           bucket.expense += Number(c.refunded_deposit);
+          refundExpenses += Number(c.refunded_deposit);
         }
       }
     });
@@ -342,6 +354,7 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
       const bucket = chartDataMap.get(monthStr);
       if (bucket) {
         bucket.expense += Number(e.amount);
+        maintenanceExpenses += Number(e.amount);
       }
     });
 
@@ -382,6 +395,12 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
         netProfit: totalRevenue - totalExpense,
         occupancyRate,
         totalTenants: tenants
+      },
+      breakdown: {
+        invoicesRevenue,
+        depositsRevenue,
+        refundExpenses,
+        maintenanceExpenses
       },
       chartData
     });

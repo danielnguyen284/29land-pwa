@@ -308,7 +308,7 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
   if (!contract) return null;
 
   return (
-    <div className="space-y-6 pb-20 md:pb-0">
+    <div className="space-y-6 pb-36 md:pb-0">
       <div className="flex-1 w-full max-w-3xl mx-auto">
         <form onSubmit={handleSave} className="space-y-6">
           
@@ -438,14 +438,14 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
             )}
           </div>
 
-          <div className="flex flex-col gap-4 pt-4 pb-10">
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-50 flex flex-col gap-3 pb-8 md:static md:p-0 md:bg-transparent md:border-none md:shadow-none md:pb-10">
             <Button type="submit" disabled={formLoading} className="w-full bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end hover:opacity-90 text-primary-foreground">
               {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu thay đổi
             </Button>
 
             {(formStatus === "ACTIVE" || formStatus === "NEW") && (
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 <Button type="button" variant="outline" className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={openCancelDialog} disabled={formLoading}>
                   Hủy hợp đồng
                 </Button>

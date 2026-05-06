@@ -43,3 +43,44 @@ export const syncExpiredContracts = async () => {
     console.error("[Cron] Error syncing expired contracts:", error);
   }
 };
+
+export const syncFutureContracts = async () => {
+  try {
+    const contractRepo = AppDataSource.getRepository(Contract);
+    const roomRepo = AppDataSource.getRepository(Room);
+    const tenantRepo = AppDataSource.getRepository(Tenant);
+
+    const today = new Date();
+    const todayString = today.toISOString().split("T")[0];
+
+    // Find all NEW contracts whose start_date has arrived or passed
+    const futureContracts = await contractRepo
+      .createQueryBuilder("c")
+      .where("c.status = :status", { status: ContractStatus.NEW })
+      .andWhere("c.start_date <= :today", { today: todayString })
+      .getMany();
+
+    if (futureContracts.length === 0) {
+      return;
+    }
+
+    console.log(`[Cron] Found ${futureContracts.length} future contracts to activate. Syncing...`);
+
+    for (const contract of futureContracts) {
+      // 1. Mark contract as ACTIVE
+      contract.status = ContractStatus.ACTIVE;
+      await contractRepo.save(contract);
+
+      // 2. Mark room as OCCUPIED
+      await roomRepo.update(contract.room_id, { status: RoomStatus.OCCUPIED });
+
+      // 3. Ensure all tenants in the contract are ACTIVE (representative is already active on creation, but good for consistency)
+      await tenantRepo.update({ contract_id: contract.id }, { status: "ACTIVE" });
+      
+      console.log(`[Cron] Contract ${contract.id} activated. Room ${contract.room_id} occupied.`);
+    }
+
+  } catch (error) {
+    console.error("[Cron] Error syncing future contracts:", error);
+  }
+};

@@ -11,9 +11,18 @@ const userRepo = () => AppDataSource.getRepository(User);
 router.use(authenticate);
 
 // GET /api/users
-router.get("/", requireRole(UserRole.ADMIN, UserRole.OWNER), async (_req: AuthRequest, res: Response) => {
+router.get("/", requireRole(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER), async (req: AuthRequest, res: Response) => {
   try {
+    const { role } = req.user!;
+    let whereClause = {};
+
+    if (role === UserRole.MANAGER) {
+      // Manager can only see technicians
+      whereClause = { role: UserRole.TECHNICIAN };
+    }
+
     const users = await userRepo().find({
+      where: whereClause,
       select: ["id", "name", "phone", "email", "role", "payment_qr_code", "created_at"],
       order: { created_at: "DESC" },
     });

@@ -21,9 +21,12 @@ import {
   ArrowLeft,
   Search,
   FileSignature,
-  ClipboardType
+  ClipboardType,
+  Sun,
+  Moon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PushNotificationHandler } from "@/components/PushNotificationHandler";
 
 const navItems = [
   { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard, roles: ["ADMIN", "MANAGER", "OWNER"] },
@@ -71,6 +74,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) return null; // or loading skeleton
 
+  if (user.role === "TECHNICIAN") {
+    const isRoot = pathname === "/tickets";
+    return (
+      <div className="flex min-h-screen w-full flex-col bg-muted/40">
+        <PushNotificationHandler />
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background px-2 sm:px-4">
+          <div className="flex items-center gap-1 sm:gap-2">
+            {!isRoot && (
+              <Button variant="ghost" size="icon" onClick={() => router.push("/tickets")} className="mr-1">
+                <ArrowLeft className="h-6 w-6" />
+              </Button>
+            )}
+            <div className="flex items-center gap-2 font-bold text-primary text-lg sm:text-xl">
+              <Wrench className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="hidden sm:inline">29LAND Kỹ thuật viên</span>
+              <span className="sm:hidden">Kỹ thuật viên</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Chế độ giao diện">
+              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="text-destructive" title="Đăng xuất">
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
+        </header>
+        <main className="flex-1 p-4 md:p-6 lg:p-8 w-full max-w-5xl mx-auto">
+          {children}
+        </main>
+      </div>
+    );
+  }
+
   const NavLinks = ({ onClick }: { onClick?: () => void }) => {
     const filteredItems = navItems.filter(item => item.roles.includes(user.role));
     return (
@@ -100,6 +138,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40 md:flex-row">
+      <PushNotificationHandler />
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 flex-col border-r bg-background md:flex">
         <div className="flex h-14 items-center border-b px-4 lg:h-[60px]">
@@ -170,7 +209,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <ArrowLeft className="h-6 w-6" />
           </Button>
           <span className="font-bold text-lg text-primary flex-1 text-center">
-            {navItems.find(item => pathname.startsWith(item.href) && item.href !== "/dashboard")?.label || "Chi tiết"}
+            {pathname === "/tickets/new" ? "Tạo phiếu sửa chữa" 
+            : pathname === "/reports" ? "Thống kê & Báo cáo" 
+            : navItems.find(item => pathname.startsWith(item.href) && item.href !== "/dashboard")?.label || "Chi tiết"}
           </span>
           <div className="w-10"></div> {/* Spacer to keep title centered */}
         </header>
@@ -200,9 +241,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
                 <div className="flex-1">
                   <p className="text-base font-bold uppercase">{user.name}</p>
-                  <p className="text-sm text-primary font-medium flex items-center gap-1 mt-0.5 group-hover:underline">
+                  {/* <p className="text-sm text-primary font-medium flex items-center gap-1 mt-0.5 group-hover:underline">
                     Hồ sơ người dùng <ChevronRight className="h-3 w-3" />
-                  </p>
+                  </p> */}
                 </div>
               </Link>
             </div>

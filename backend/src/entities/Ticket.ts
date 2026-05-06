@@ -3,16 +3,19 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
 } from "typeorm";
 import { Room } from "./Room";
 import { User } from "./User";
+import { TicketExpense } from "./TicketExpense";
 
 export enum TicketStatus {
   PENDING = "PENDING",
   IN_PROGRESS = "IN_PROGRESS",
+  WAITING_APPROVAL = "WAITING_APPROVAL",
   NEEDS_EXPLANATION = "NEEDS_EXPLANATION",
   COMPLETED = "COMPLETED",
   OVERDUE = "OVERDUE",
@@ -58,4 +61,7 @@ export class Ticket {
 
   @UpdateDateColumn()
   updated_at!: Date;
+
+  @OneToMany(() => TicketExpense, (expense) => expense.ticket)
+  expenses!: TicketExpense[];
 }

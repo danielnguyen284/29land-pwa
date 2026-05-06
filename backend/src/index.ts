@@ -14,11 +14,13 @@ import reportRoutes from "./routes/reports";
 import billingRoutes from "./routes/billing";
 import contractRoutes from "./routes/contracts";
 import uploadRoutes from "./routes/upload";
+import notificationRoutes from "./routes/notifications";
 import { IsNull } from "typeorm";
 import { Tenant } from "./entities/Tenant";
 import { Contract } from "./entities/Contract";
-import { syncExpiredContracts } from "./cron/contracts";
+import { syncExpiredContracts, syncFutureContracts } from "./cron/contracts";
 import { autoGenerateInvoices } from "./cron/billing";
+import cron from "node-cron";
 
 dotenv.config();
 
@@ -44,6 +46,7 @@ app.use("/api/tickets", ticketRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/contracts", contractRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Bootstrap
 AppDataSource.initialize()
@@ -53,6 +56,8 @@ AppDataSource.initialize()
 
     // Run expiration check on startup
     await syncExpiredContracts();
+    // Run future check on startup
+    await syncFutureContracts();
     // Run invoice generation check on startup
     await autoGenerateInvoices();
     
@@ -87,6 +92,11 @@ AppDataSource.initialize()
       syncExpiredContracts();
       autoGenerateInvoices();
     }, 60 * 60 * 1000);
+
+    // Set up daily cron job at 00:00
+    cron.schedule("0 0 * * *", () => {
+      syncFutureContracts();
+    });
 
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);

@@ -125,6 +125,14 @@ router.post("/:roomId/contracts", requireRole(UserRole.ADMIN, UserRole.OWNER, Us
       return;
     }
 
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const startDateObj = new Date(start_date);
+    startDateObj.setHours(0, 0, 0, 0);
+
+    const isFutureContract = startDateObj > todayDate;
+    const initialContractStatus = isFutureContract ? ContractStatus.NEW : ContractStatus.ACTIVE;
+
     const contract = contractRepo().create({
       room_id,
       representative_tenant_id,
@@ -132,7 +140,7 @@ router.post("/:roomId/contracts", requireRole(UserRole.ADMIN, UserRole.OWNER, Us
       end_date,
       rent_amount: rent_amount || 0,
       deposit_amount: deposit_amount || 0,
-      status: ContractStatus.ACTIVE,
+      status: initialContractStatus,
       document_photos: document_photos || [],
     });
 
@@ -151,8 +159,9 @@ router.post("/:roomId/contracts", requireRole(UserRole.ADMIN, UserRole.OWNER, Us
         .execute();
     }
 
-    // Update room status to OCCUPIED
-    await roomRepo().update(room_id, { status: RoomStatus.OCCUPIED });
+    // Update room status
+    const newRoomStatus = isFutureContract ? RoomStatus.DEPOSITED : RoomStatus.OCCUPIED;
+    await roomRepo().update(room_id, { status: newRoomStatus });
 
     res.status(201).json(saved);
   } catch (error) {

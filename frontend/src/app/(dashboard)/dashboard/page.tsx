@@ -74,6 +74,11 @@ export default function DashboardPage() {
       try {
         const user = JSON.parse(storedUser);
         setUserRole(user.role);
+        
+        if (user.role === "TECHNICIAN") {
+          router.push("/tickets");
+          return;
+        }
       } catch (e) {
         console.error(e);
       }
@@ -111,11 +116,19 @@ export default function DashboardPage() {
 
   const { occupancy, revenue, period, tenants, contracts } = data;
 
-  const formatCurrency = (amount: number) => {
+  const formatCompactCurrency = (value: number) => {
+    const absValue = Math.abs(value);
+    const sign = value < 0 ? "-" : "";
+    if (absValue >= 1000000000) {
+      return sign + (absValue / 1000000000).toFixed(1) + " Tỷ";
+    }
+    if (absValue >= 1000000) {
+      return sign + (absValue / 1000000).toFixed(1) + " Tr";
+    }
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
-    }).format(amount);
+    }).format(value);
   };
 
   const formatPeriod = (p: string) => {
@@ -135,7 +148,7 @@ export default function DashboardPage() {
     { id: "close_numbers", label: "Chốt số", icon: FileEdit, href: "/meter-readings", roles: ["ADMIN", "MANAGER"] },
     // { id: "approvals", label: "Phê duyệt", icon: ClipboardCheck, href: "/approvals", roles: ["ADMIN", "OWNER"] },
     // { id: "finance", label: "Thu chi", icon: Banknote, href: "/finance", roles: ["ADMIN", "MANAGER", "OWNER"] },
-    // { id: "incidents", label: "Sự cố", icon: Siren, href: "/tickets", roles: ["ADMIN", "MANAGER", "TECHNICIAN", "OWNER"] },
+    { id: "incidents", label: "Sự cố", icon: Siren, href: "/tickets", roles: ["ADMIN", "MANAGER", "TECHNICIAN", "OWNER"] },
     // { id: "feedback", label: "Góp ý", icon: Mail, href: "/feedback", roles: ["ADMIN", "MANAGER"] },
     // { id: "listings", label: "Tin đăng", icon: Store, href: "/listings", roles: ["ADMIN", "MANAGER"] },
     { id: "invoices", label: "Hoá đơn", icon: Receipt, href: "/billing", roles: ["ADMIN", "MANAGER", "OWNER"] },
@@ -234,7 +247,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex justify-between items-end mt-2">
                 <p className="text-2xl md:text-3xl font-bold tracking-tight text-primary">
-                  {isRevenueVisible ? formatCurrency(revenue.collected) : "******"}
+                  {isRevenueVisible ? formatCompactCurrency(revenue.collected) : "******"}
                 </p>
               </div>
             </CardContent>

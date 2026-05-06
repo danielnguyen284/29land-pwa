@@ -38,6 +38,12 @@ export class TicketExpense {
   @Column({ type: "enum", enum: ExpenseStatus, default: ExpenseStatus.PENDING })
   status!: ExpenseStatus;
 
+  @Column({ type: "text", nullable: true })
+  reject_reason!: string;
+
+  @Column({ type: "text", nullable: true })
+  technician_comment!: string;
+
   @CreateDateColumn()
   created_at!: Date;
 }
