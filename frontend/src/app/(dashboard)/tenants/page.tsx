@@ -237,67 +237,71 @@ export default function TenantsPage() {
 
       <div className="space-y-4">
       {/* Filters */}
-      <Card className="shadow-sm">
-        <CardContent className="p-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2 w-full relative">
-              <label className="text-sm font-medium text-muted-foreground">Tìm kiếm</label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Tên, SĐT, CCCD..."
-                  className="pl-9"
-                  value={filterSearch}
-                  onChange={(e) => setFilterSearch(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2 w-full">
-              <label className="text-sm font-medium text-muted-foreground">Nhà</label>
-              <SearchableSelect
-                options={[
-                  { value: "ALL", label: "Tất cả" },
-                  ...buildings.map((b) => ({
-                    value: b.id,
-                    label: `${b.name}${
-                      [b.address, b.ward, b.district, b.province]
-                        .filter(Boolean)
-                        .join(", ")
-                        ? ` - ${[b.address, b.ward, b.district, b.province]
-                            .filter(Boolean)
-                            .join(", ")}`
-                        : ""
-                    }`,
-                    displayLabel: b.name,
-                  })),
-                ]}
-                value={filterBuilding}
-                onValueChange={(v) => setFilterBuilding(v || "ALL")}
-                placeholder="Tất cả"
-                searchPlaceholder="Tìm kiếm nhà..."
-              />
-            </div>
-            
-            <div className="space-y-2 w-full">
-              <label className="text-sm font-medium text-muted-foreground">Trạng thái</label>
-              <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val || "ALL")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Tất cả">
-                    {filterStatus === "ALL" ? "Tất cả" : 
-                     filterStatus === "ACTIVE" ? "Đang thuê" : "Đã rời đi"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Tất cả</SelectItem>
-                  <SelectItem value="ACTIVE">Đang thuê</SelectItem>
-                  <SelectItem value="INACTIVE">Đã rời đi</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="grid gap-3 my-3">
+        <div className="space-y-1.5 relative">
+          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Tìm kiếm</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Tên, SĐT, CCCD..."
+              className="pl-9 bg-background rounded-xl h-10 w-full"
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+            />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Toà nhà</Label>
+          <SearchableSelect
+            options={[
+              { value: "ALL", label: "Tất cả nhà" },
+              ...buildings.map((b) => ({
+                value: b.id,
+                label: `${b.name}${
+                  [b.address, b.ward, b.district, b.province]
+                    .filter(Boolean)
+                    .join(", ")
+                    ? ` - ${[b.address, b.ward, b.district, b.province]
+                        .filter(Boolean)
+                        .join(", ")}`
+                    : ""
+                }`,
+                displayLabel: b.name,
+              })),
+            ]}
+            value={filterBuilding}
+            onValueChange={(v) => setFilterBuilding(v || "ALL")}
+            placeholder="Tất cả nhà"
+            searchPlaceholder="Tìm kiếm nhà..."
+            className="bg-background rounded-xl w-full h-10"
+          />
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex overflow-x-auto hide-scrollbar gap-2 mb-6 pb-2">
+        <Button 
+          variant={filterStatus === "ALL" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "ALL" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => setFilterStatus("ALL")}
+        >
+          Tất cả
+        </Button>
+        <Button 
+          variant={filterStatus === "ACTIVE" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "ACTIVE" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => setFilterStatus("ACTIVE")}
+        >
+          Đang thuê
+        </Button>
+        <Button 
+          variant={filterStatus === "INACTIVE" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "INACTIVE" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => setFilterStatus("INACTIVE")}
+        >
+          Đã rời đi
+        </Button>
+      </div>
 
 
       {/* Tenant List */}
@@ -312,49 +316,47 @@ export default function TenantsPage() {
           <p className="text-muted-foreground">Không tìm thấy khách hàng nào phù hợp với bộ lọc hiện tại.</p>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {tenants.map((tenant) => (
-            <Card key={tenant.id} className="hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden">
-              <div className={`h-2 ${tenant.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-muted'}`} />
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start gap-2">
-                  <div>
-                    <CardTitle className="text-lg font-bold">{tenant.name}</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      {tenant.is_representative ? (
-                        <span className="text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">Đại diện</span>
-                      ) : (
-                        <span className="text-[10px] font-semibold bg-muted text-muted-foreground px-2 py-0.5 rounded-full uppercase">Thành viên</span>
-                      )}
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase ${tenant.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-destructive/10 text-destructive'}`}>
-                        {tenant.status === 'ACTIVE' ? 'Đang thuê' : 'Đã rời đi'}
-                      </span>
-                    </div>
-                  </div>
+            <Card key={tenant.id} className="hover:shadow-md transition-shadow bg-card border shadow-sm rounded-xl overflow-hidden flex flex-col h-full p-0 gap-0">
+              <div className="bg-primary/5 border-b border-primary/10 px-3 py-2.5 sm:px-4 sm:py-3">
+                <div className="font-semibold text-primary truncate text-sm sm:text-base">
+                  {tenant.name}
                 </div>
-              </CardHeader>
+              </div>
               
-              <CardContent className="flex-1 space-y-3 pb-3">
-                <div className="grid gap-2 text-sm">
+              <CardContent className="px-2.5 sm:px-4 pb-3 pt-3 flex-1 flex flex-col space-y-2.5">
+                <div className="grid gap-2 text-xs sm:text-sm flex-1">
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Phone className="w-4 h-4 shrink-0" />
+                    <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                     <span className="truncate">{tenant.phone || "Chưa cập nhật"}</span>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <CreditCard className="w-4 h-4 shrink-0" />
+                    <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                     <span className="truncate">{tenant.cccd || "Chưa cập nhật"}</span>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Home className="w-4 h-4 shrink-0" />
+                    <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                     <span className="truncate text-foreground font-medium">
                       {tenant.room?.name} <span className="text-muted-foreground font-normal">({tenant.room?.floor?.building?.name})</span>
                     </span>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-2 pt-1.5 flex-wrap">
+                  {tenant.is_representative ? (
+                    <span className="text-[10px] sm:text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-md uppercase">Đại diện</span>
+                  ) : (
+                    <span className="text-[10px] sm:text-xs font-semibold bg-muted text-muted-foreground px-2 py-0.5 rounded-md uppercase">Thành viên</span>
+                  )}
+                  <span className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-md uppercase ${tenant.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-destructive/10 text-destructive'}`}>
+                    {tenant.status === 'ACTIVE' ? 'Đang thuê' : 'Đã rời đi'}
+                  </span>
+                </div>
               </CardContent>
               
-              <CardFooter className="pt-0 border-t bg-muted/20 p-3">
-                <Button variant="ghost" className="w-full h-8 text-sm text-primary" onClick={() => handleOpenEditModal(tenant)}>
+              <CardFooter className="pt-0 border-t bg-muted/20 p-2 sm:p-3">
+                <Button variant="ghost" className="w-full h-8 text-xs sm:text-sm text-primary" onClick={() => handleOpenEditModal(tenant)}>
                   <Pencil className="w-3.5 h-3.5 mr-2" />
                   Sửa thông tin
                 </Button>

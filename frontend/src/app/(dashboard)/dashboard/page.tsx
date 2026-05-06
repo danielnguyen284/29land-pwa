@@ -150,12 +150,11 @@ export default function DashboardPage() {
   const displayedActions = isExpanded ? quickActions : quickActions.slice(0, 8);
 
   return (
-    <div className="pb-10 min-h-screen bg-slate-50/50 dark:bg-background">
-      {/* Header Background (Decorative) */}
-      <div className="fixed top-0 left-0 w-full h-40 bg-primary rounded-b-[2rem] z-0 pointer-events-none"></div>
-
+    <div 
+      className="pb-10 min-h-screen bg-slate-50/50 dark:bg-background bg-cover bg-center bg-no-repeat bg-fixed bg-[url('/dashboard-bg-modern.svg')] dark:bg-[url('/dashboard-bg-modern-dark.svg')]"
+    >
       {/* Top 4 Overlapping Cards */}
-      <div className="pt-12 px-4 max-w-5xl mx-auto relative z-10">
+      <div className="pt-6 px-4 max-w-5xl mx-auto relative z-10">
         <div className="grid grid-cols-2 gap-3 md:gap-4">
           
           {/* Card 1: Phòng trống */}
@@ -256,7 +255,7 @@ export default function DashboardPage() {
                     onClick={() => router.push(action.href)} 
                     className="flex flex-col items-center gap-2.5 group active:scale-95 transition-transform"
                   >
-                    <div className="w-14 h-14 md:w-16 md:h-16 bg-primary text-primary-foreground rounded-2xl md:rounded-3xl flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:-translate-y-0.5 transition-all">
+                    <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-primary-gradient-start to-primary-gradient-end text-primary-foreground rounded-2xl md:rounded-3xl flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:-translate-y-0.5 transition-all">
                       <Icon className="w-6 h-6 md:w-7 md:h-7"/>
                     </div>
                     <span className="text-[11px] md:text-xs font-semibold text-center leading-tight whitespace-pre-wrap">{action.label}</span>

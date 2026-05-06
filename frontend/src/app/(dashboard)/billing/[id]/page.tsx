@@ -176,7 +176,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex justify-end print:hidden">
         <Button variant="outline" onClick={handleDownloadImage}>
           <ImageIcon className="mr-2 h-4 w-4" />
-          Tải ảnh gửi Zalo
+          Tải ảnh hóa đơn
         </Button>
       </div>
 

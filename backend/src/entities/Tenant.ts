@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 import { Room } from "./Room";
+import { Contract } from "./Contract";
 
 @Entity("tenants")
 export class Tenant {
@@ -20,6 +21,13 @@ export class Tenant {
   @ManyToOne(() => Room)
   @JoinColumn({ name: "room_id" })
   room!: Room;
+
+  @Column({ nullable: true })
+  contract_id!: string;
+
+  @ManyToOne(() => Contract)
+  @JoinColumn({ name: "contract_id" })
+  contract!: Contract;
 
   @Column()
   name!: string;

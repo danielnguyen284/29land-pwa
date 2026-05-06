@@ -35,6 +35,8 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-gradient-start: var(--primary-gradient-start);
+  --color-primary-gradient-end: var(--primary-gradient-end);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -56,7 +58,9 @@
   --card-foreground: oklch(0.145 0.005 160);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0.005 160);
-  --primary: oklch(0.528 0.155 142.34); /* #15803D */
+  --primary: oklch(0.51 0.118 153.28); /* emerald-700 / #047857 */
+  --primary-gradient-start: oklch(0.51 0.118 153.28);
+  --primary-gradient-end: oklch(0.66 0.15 153.28); /* emerald-500 / #10b981 */
   --primary-foreground: oklch(0.985 0.002 160);
   --secondary: oklch(0.955 0.015 160);
   --secondary-foreground: oklch(0.528 0.155 142.34);
@@ -91,7 +95,9 @@
   --card-foreground: oklch(0.94 0.005 160);
   --popover: oklch(0.18 0.015 160);
   --popover-foreground: oklch(0.94 0.005 160);
-  --primary: oklch(0.685 0.169 143.795); /* green-500 for dark mode */
+  --primary: oklch(0.66 0.15 153.28); /* emerald-500 for dark mode */
+  --primary-gradient-start: oklch(0.66 0.15 153.28);
+  --primary-gradient-end: oklch(0.51 0.118 153.28);
   --primary-foreground: oklch(0.13 0.01 160);
   --secondary: oklch(0.22 0.02 160);
   --secondary-foreground: oklch(0.94 0.005 160);

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <rect width="1920" height="1080" fill="#020617"/>
+  
+  <!-- TOP LEFT -->
+  <g>
+    <!-- Large Emerald Area -->
+    <polygon points="0,0 1100,0 0,1100" fill="#047857" opacity="0.15" />
+    
+    <!-- Dark Emerald Thick Block -->
+    <polygon points="0,400 400,0 600,0 0,600" fill="#059669" />
+    
+    <!-- Emerald Thick Block -->
+    <polygon points="0,200 200,0 450,0 0,450" fill="#10b981" opacity="0.9" />
+    
+    <!-- Light Emerald Thin Stripe -->
+    <polygon points="0,650 650,0 680,0 0,680" fill="#34d399" />
+    
+    <!-- Orange Thin Stripe (Accent) -->
+    <polygon points="0,720 720,0 740,0 0,740" fill="#f59e0b" />
+    
+    <!-- Another Emerald Block -->
+    <polygon points="0,780 780,0 900,0 0,900" fill="#064e3b" opacity="0.6" />
+    
+    <!-- Decorative floating block -->
+    <polygon points="200,800 400,600 450,650 250,850" fill="#059669" opacity="0.5" />
+    <polygon points="100,900 150,850 200,900 150,950" fill="#f59e0b" opacity="0.8" />
+  </g>
+
+  <!-- BOTTOM RIGHT -->
+  <g>
+    <!-- Large Emerald Area -->
+    <polygon points="1920,1080 820,1080 1920,-20" fill="#047857" opacity="0.15" />
+    
+    <!-- Dark Emerald Thick Block -->
+    <polygon points="1920,680 1520,1080 1320,1080 1920,480" fill="#059669" />
+    
+    <!-- Emerald Thick Block -->
+    <polygon points="1920,880 1720,1080 1470,1080 1920,630" fill="#10b981" opacity="0.9" />
+    
+    <!-- Light Emerald Thin Stripe -->
+    <polygon points="1920,430 1270,1080 1240,1080 1920,400" fill="#34d399" />
+    
+    <!-- Orange Thin Stripe (Accent) -->
+    <polygon points="1920,360 1200,1080 1180,1080 1920,340" fill="#f59e0b" />
+    
+    <!-- Another Emerald Block -->
+    <polygon points="1920,300 1140,1080 1020,1080 1920,180" fill="#064e3b" opacity="0.6" />
+    
+    <!-- Decorative floating block -->
+    <polygon points="1720,280 1520,480 1470,430 1670,230" fill="#059669" opacity="0.5" />
+    <polygon points="1820,180 1770,230 1720,180 1770,130" fill="#f59e0b" opacity="0.8" />
+  </g>
+</svg>

@@ -10,7 +10,11 @@ import {
   FileSignature,
   Eye,
   Ban,
-  RefreshCw
+  RefreshCw,
+  Info,
+  Home,
+  Building2,
+  Calendar
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -59,7 +63,7 @@ interface Contract {
   end_date: string;
   rent_amount: number;
   deposit_amount: number;
-  status: "NEW" | "ACTIVE" | "EXPIRED" | "TERMINATED";
+  status: "NEW" | "ACTIVE" | "EXPIRED" | "TERMINATED" | "CANCELLED";
   document_photos: string[];
   created_at: string;
   room: {
@@ -80,7 +84,7 @@ interface Contract {
   representative_tenant: Tenant;
 }
 
-type TabKey = "ALL" | "ACTIVE" | "EXPIRING" | "EXPIRED" | "DEPOSIT" | "TERMINATED";
+type TabKey = "ALL" | "ACTIVE" | "EXPIRING" | "EXPIRED" | "DEPOSIT" | "TERMINATED" | "CANCELLED";
 
 export default function ContractsPage() {
   const router = useRouter();
@@ -150,12 +154,18 @@ export default function ContractsPage() {
   };
 
   const handleCancelContract = async (contract: Contract) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn hủy hợp đồng phòng ${contract.room.name}?`)) return;
+    const reason = window.prompt(`Nhập lý do hủy hợp đồng phòng ${contract.room.name} (Bắt buộc):`);
+    if (reason === null) return;
+    if (!reason.trim()) {
+      toast.error("Vui lòng nhập lý do hủy hợp đồng");
+      return;
+    }
     
     try {
       setCancelingId(contract.id);
       await apiFetch(`/api/rooms/${contract.room.id}/contracts/${contract.id}/cancel`, {
-        method: "POST"
+        method: "POST",
+        body: JSON.stringify({ notes: reason })
       });
       toast.success("Đã hủy hợp đồng thành công");
       fetchContracts();
@@ -185,12 +195,12 @@ export default function ContractsPage() {
 
   // Helper to categorize contracts
   const today = new Date();
-  const twoMonthsLater = new Date();
-  twoMonthsLater.setMonth(twoMonthsLater.getMonth() + 2);
+  const oneMonthLater = new Date();
+  oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
 
   const isExpiring = (endDateStr: string) => {
     const end = new Date(endDateStr);
-    return end >= today && end <= twoMonthsLater;
+    return end >= today && end <= oneMonthLater;
   };
 
   const isExpiredLocally = (endDateStr: string) => {
@@ -207,6 +217,7 @@ export default function ContractsPage() {
         case "EXPIRED": return c.status === "EXPIRED" || (c.status === "ACTIVE" && isExpiredLocally(c.end_date));
         case "DEPOSIT": return c.status === "NEW";
         case "TERMINATED": return c.status === "TERMINATED";
+        case "CANCELLED": return c.status === "CANCELLED";
         default: return true;
       }
     });
@@ -220,6 +231,7 @@ export default function ContractsPage() {
       EXPIRED: contracts.filter(c => c.status === "EXPIRED" || (c.status === "ACTIVE" && isExpiredLocally(c.end_date))).length,
       DEPOSIT: contracts.filter(c => c.status === "NEW").length,
       TERMINATED: contracts.filter(c => c.status === "TERMINATED").length,
+      CANCELLED: contracts.filter(c => c.status === "CANCELLED").length,
     };
   }, [contracts]);
 
@@ -311,45 +323,52 @@ export default function ContractsPage() {
         <div className="flex overflow-x-auto hide-scrollbar gap-2 mb-6 pb-2">
           <Button 
             variant={activeTab === "ALL" ? "default" : "outline"} 
-            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "ALL" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "ALL" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
             onClick={() => setActiveTab("ALL")}
           >
             Tất cả ({counts.ALL})
           </Button>
           <Button 
             variant={activeTab === "ACTIVE" ? "default" : "outline"} 
-            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "ACTIVE" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "ACTIVE" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
             onClick={() => setActiveTab("ACTIVE")}
           >
             Còn hạn ({counts.ACTIVE})
           </Button>
           <Button 
             variant={activeTab === "EXPIRING" ? "default" : "outline"} 
-            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "EXPIRING" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "EXPIRING" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
             onClick={() => setActiveTab("EXPIRING")}
           >
             Sắp hết hạn ({counts.EXPIRING})
           </Button>
           <Button 
             variant={activeTab === "DEPOSIT" ? "default" : "outline"} 
-            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "DEPOSIT" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "DEPOSIT" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
             onClick={() => setActiveTab("DEPOSIT")}
           >
             Cọc ({counts.DEPOSIT})
           </Button>
           <Button 
             variant={activeTab === "EXPIRED" ? "default" : "outline"} 
-            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "EXPIRED" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "EXPIRED" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
             onClick={() => setActiveTab("EXPIRED")}
           >
             Hết hạn ({counts.EXPIRED})
           </Button>
           <Button 
             variant={activeTab === "TERMINATED" ? "default" : "outline"} 
-            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "TERMINATED" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "TERMINATED" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
             onClick={() => setActiveTab("TERMINATED")}
           >
-            Đã hủy ({counts.TERMINATED})
+            Đã thanh lý ({counts.TERMINATED})
+          </Button>
+          <Button 
+            variant={activeTab === "CANCELLED" ? "default" : "outline"} 
+            className={`rounded-xl whitespace-nowrap px-4 ${activeTab === "CANCELLED" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+            onClick={() => setActiveTab("CANCELLED")}
+          >
+            Đã hủy ({counts.CANCELLED})
           </Button>
         </div>
 
@@ -384,74 +403,116 @@ export default function ContractsPage() {
             <p className="text-muted-foreground font-medium">Không tìm thấy hợp đồng nào</p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {filteredContracts.map(c => {
               const b = c.room?.floor?.building;
-              const fullAddress = b ? [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") : "";
               const isTerminated = c.status === "TERMINATED";
 
               return (
-              <Card key={c.id} className="rounded-2xl border-none shadow-sm flex flex-col">
-                <CardContent className="p-4 flex-1">
-                  <div className="flex justify-between items-start mb-2 gap-2">
-                    <div className="overflow-hidden">
-                      <h3 className="font-bold text-lg truncate">{c.room?.name || "Phòng"}</h3>
-                      <p className="text-xs text-muted-foreground truncate">{c.room?.floor?.name} {b?.name ? `- ${b.name}` : ""}</p>
-                      {fullAddress && <p className="text-xs text-muted-foreground truncate mt-0.5" title={fullAddress}>• {fullAddress}</p>}
-                    </div>
-                    {c.status === "ACTIVE" && isExpiring(c.end_date) ? (
-                       <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none">Sắp hết hạn</Badge>
-                    ) : c.status === "ACTIVE" && isExpiredLocally(c.end_date) ? (
-                      <Badge variant="destructive" className="border-none">Hết hạn</Badge>
-                    ) : c.status === "EXPIRED" ? (
-                      <Badge variant="destructive" className="border-none">Hết hạn</Badge>
-                    ) : c.status === "ACTIVE" ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">Còn hạn</Badge>
-                    ) : c.status === "NEW" ? (
-                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none">Đã cọc</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-muted-foreground border-none bg-muted">Đã hủy</Badge>
-                    )}
+              <Card 
+                key={c.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer bg-card border shadow-sm rounded-xl overflow-hidden flex flex-col p-0 gap-0"
+                onClick={() => handleContractClick(c)}
+              >
+                <div className="bg-primary/5 border-b border-primary/10 px-3 py-2.5 sm:px-4 sm:py-3">
+                  <div className="font-semibold text-primary truncate text-sm sm:text-base">
+                    {c.representative_tenant?.name || "Khách thuê"}
                   </div>
-                  <div className="space-y-1 mt-3 text-sm">
-                    <p><span className="text-muted-foreground">Khách thuê:</span> <span className="font-medium">{c.representative_tenant?.name}</span></p>
-                    <p><span className="text-muted-foreground">Bắt đầu:</span> {formatDate(c.start_date)}</p>
-                    <p><span className="text-muted-foreground">Kết thúc:</span> <span className={isExpiredLocally(c.end_date) ? "text-destructive font-medium" : ""}>{formatDate(c.end_date)}</span></p>
-                    <p><span className="text-muted-foreground">Tiền phòng:</span> {formatCurrency(c.rent_amount)}</p>
+                </div>
+                <CardContent className="px-2.5 sm:px-4 pb-2 pt-3 space-y-2.5 flex-1">
+                  {c.status === "ACTIVE" && isExpiring(c.end_date) ? (
+                    <div className="flex items-center text-xs sm:text-sm text-amber-600 font-medium">
+                      <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                      <span>Sắp hết hạn</span>
+                    </div>
+                  ) : c.status === "ACTIVE" && isExpiredLocally(c.end_date) ? (
+                    <div className="flex items-center text-xs sm:text-sm text-destructive font-medium">
+                      <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                      <span>Hết hạn</span>
+                    </div>
+                  ) : c.status === "EXPIRED" ? (
+                    <div className="flex items-center text-xs sm:text-sm text-destructive font-medium">
+                      <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                      <span>Hết hạn</span>
+                    </div>
+                  ) : c.status === "ACTIVE" ? (
+                    <div className="flex items-center text-xs sm:text-sm text-emerald-600 font-medium">
+                      <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                      <span>Còn hạn</span>
+                    </div>
+                  ) : c.status === "NEW" ? (
+                    <div className="flex items-center text-xs sm:text-sm text-blue-600 font-medium">
+                      <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                      <span>Đã cọc</span>
+                    </div>
+                  ) : c.status === "CANCELLED" ? (
+                    <div className="flex items-center text-xs sm:text-sm text-destructive font-medium">
+                      <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                      <span>Đã hủy</span>
+                    </div>
+                  ) : c.status === "TERMINATED" ? (
+                    <div className="flex items-center text-xs sm:text-sm text-muted-foreground font-medium">
+                      <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                      <span>Đã thanh lý</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-xs sm:text-sm text-muted-foreground font-medium">
+                      <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                      <span>Không rõ</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-start text-xs sm:text-sm text-primary font-bold">
+                    <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                    <span className="truncate">{c.room?.name || "Phòng"}</span>
+                  </div>
+                  
+                  <div className="flex items-start text-xs sm:text-sm text-muted-foreground font-medium">
+                    <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                    <span className="truncate" title={b?.name}>{b?.name || "Chưa có toà nhà"}</span>
+                  </div>
+
+                  <div className="flex items-start text-xs sm:text-sm text-muted-foreground font-medium">
+                    <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 mt-0.5 shrink-0" />
+                    <span className="line-clamp-2 leading-relaxed">
+                      {formatDate(c.start_date)} - {formatDate(c.end_date)}
+                    </span>
                   </div>
                 </CardContent>
-                <div className="p-4 pt-0 mt-auto flex items-center justify-end gap-2">
+
+                <div className="p-2 sm:p-4 pt-0 mt-auto flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
                   {isTerminated ? (
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="rounded-lg"
-                      onClick={() => handleReactivateContract(c)}
-                      disabled={reactivatingId === c.id || cancelingId === c.id}
+                      className="rounded-md h-7 px-2 text-[10px] sm:text-xs text-muted-foreground"
+                      disabled={true}
                     >
-                      {reactivatingId === c.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-                      Kích hoạt lại
+                      Đã thanh lý
                     </Button>
-                  ) : (
+                  ) : c.status === "CANCELLED" ? (
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => handleCancelContract(c)}
+                      className="rounded-md h-7 px-2 text-[10px] sm:text-xs"
+                      onClick={(e) => { e.stopPropagation(); handleReactivateContract(c); }}
+                      disabled={reactivatingId === c.id || cancelingId === c.id}
+                    >
+                      {reactivatingId === c.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                      Kích hoạt lại
+                    </Button>
+                  ) : c.status === "ACTIVE" ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="rounded-md h-7 px-2 text-[10px] sm:text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => { e.stopPropagation(); handleCancelContract(c); }}
                       disabled={cancelingId === c.id || reactivatingId === c.id}
                     >
-                      {cancelingId === c.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Ban className="h-4 w-4 mr-1" />}
-                      Hủy hợp đồng
+                      {cancelingId === c.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Ban className="h-3 w-3 mr-1" />}
+                      Hủy
                     </Button>
-                  )}
-                  <Button 
-                    size="sm" 
-                    className="rounded-lg"
-                    onClick={() => handleContractClick(c)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Xem chi tiết
-                  </Button>
+                  ) : null}
                 </div>
               </Card>
               );
@@ -463,7 +524,7 @@ export default function ContractsPage() {
       {/* Floating Action Button for Mobile */}
       <div className="fixed bottom-0 left-0 w-full p-4 bg-background border-t md:hidden z-20">
         <Button 
-          className="w-full rounded-2xl py-6 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg" 
+          className="w-full rounded-2xl py-6 text-base font-semibold bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end hover:opacity-90 text-primary-foreground shadow-lg" 
           onClick={handleAddClick}
         >
           Thêm mới

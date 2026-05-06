@@ -7,7 +7,7 @@ import { Floor } from "../entities/Floor";
 import { Room } from "../entities/Room";
 import { User, UserRole } from "../entities/User";
 import { authenticate, requireRole, AuthRequest } from "../middlewares/auth";
-import { In } from "typeorm";
+import { In, ILike } from "typeorm";
 
 const router = Router();
 const buildingRepo = () => AppDataSource.getRepository(Building);
@@ -39,6 +39,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 12;
     const skip = (page - 1) * limit;
 
+    const search = req.query.search as string;
     let whereClause: any = {};
 
     if (role === UserRole.ADMIN) {
@@ -56,6 +57,10 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     } else {
       res.json({ data: [], meta: { total: 0, page, limit, totalPages: 0 } });
       return;
+    }
+
+    if (search) {
+      whereClause.name = ILike(`%${search}%`);
     }
 
     const [buildings, total] = await buildingRepo().findAndCount({

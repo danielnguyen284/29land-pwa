@@ -85,7 +85,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onClick={onClick}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
               isActive 
-                ? "bg-primary text-primary-foreground" 
+                ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             }`}
           >

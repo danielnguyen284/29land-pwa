@@ -154,8 +154,14 @@ router.delete("/:id", requireRole(UserRole.ADMIN), async (req: AuthRequest, res:
 
     await userRepo().remove(user);
     res.json({ message: "Đã xóa người dùng" });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Delete user error:", error);
+    
+    if (error.code === "23503") {
+      res.status(409).json({ message: "Không thể xóa người dùng này vì họ đang có dữ liệu liên kết (sở hữu/quản lý tòa nhà, hợp đồng, hoặc công việc)." });
+      return;
+    }
+    
     res.status(500).json({ message: "Lỗi hệ thống" });
   }
 });

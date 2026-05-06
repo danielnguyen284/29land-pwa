@@ -67,6 +67,7 @@ function NewContractForm() {
   const [formRoomId, setFormRoomId] = useState<string>(initialRoomId);
   const [formTenantMode, setFormTenantMode] = useState<"existing" | "new">("existing");
   const [formTenantId, setFormTenantId] = useState<string>("");
+  const [formAccompanyingTenantIds, setFormAccompanyingTenantIds] = useState<string[]>([]);
   const [formNewTenant, setFormNewTenant] = useState({ name: "", phone: "", cccd: "" });
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
@@ -124,6 +125,7 @@ function NewContractForm() {
     } else {
       setFormTenants([]);
       setFormTenantId("");
+      setFormAccompanyingTenantIds([]);
       setFormRent("");
       setFormDeposit("");
     }
@@ -225,6 +227,7 @@ function NewContractForm() {
         rent_amount: Number(formRent),
         deposit_amount: Number(formDeposit),
         document_photos: formPhotos,
+        tenant_ids: [finalTenantId, ...formAccompanyingTenantIds],
         status: "ACTIVE" // Default status for new contract
       };
 
@@ -342,6 +345,35 @@ function NewContractForm() {
                 </div>
               </div>
             )}
+
+            {/* Accompanying Tenants Selection */}
+            {formTenants.filter(t => t.id !== (formTenantMode === "existing" ? formTenantId : "")).length > 0 && (
+              <div className="pt-4 border-t mt-4">
+                <Label className="text-base font-semibold block mb-3">Khách thuê đi kèm (từ danh sách phòng)</Label>
+                <div className="space-y-3">
+                  {formTenants
+                    .filter(t => t.id !== (formTenantMode === "existing" ? formTenantId : ""))
+                    .map(t => (
+                      <label key={t.id} className="flex items-center space-x-3 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          checked={formAccompanyingTenantIds.includes(t.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormAccompanyingTenantIds(prev => [...prev, t.id]);
+                            } else {
+                              setFormAccompanyingTenantIds(prev => prev.filter(id => id !== t.id));
+                            }
+                          }}
+                        />
+                        <span className="text-sm font-medium">{t.name}</span>
+                        {t.phone && <span className="text-xs text-muted-foreground">- {t.phone}</span>}
+                      </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-card border rounded-2xl p-5 shadow-sm space-y-5">
@@ -416,7 +448,7 @@ function NewContractForm() {
 
           <div className="flex gap-4 pt-4 pb-10">
             <Button type="button" variant="outline" className="flex-1" onClick={() => router.push("/contracts")}>Hủy</Button>
-            <Button type="submit" disabled={formLoading} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button type="submit" disabled={formLoading} className="flex-1 bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end hover:opacity-90 text-primary-foreground">
               {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Tạo hợp đồng
             </Button>

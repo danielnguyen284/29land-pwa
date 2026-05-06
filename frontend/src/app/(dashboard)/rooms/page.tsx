@@ -11,6 +11,7 @@ import {
   FileSignature
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -129,63 +130,69 @@ export default function RoomsPage() {
 
 
       {/* Filters */}
-      <Card className="shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-4">
-            <div className="space-y-2 w-full">
-              <label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                <Building2 className="w-4 h-4" /> Chọn tòa nhà
-              </label>
-              <SearchableSelect
-                options={[
-                  { value: "ALL", label: "Tất cả" },
-                  ...buildings.map((b) => ({
-                    value: b.id,
-                    label: `${b.name}${
-                      [b.address, b.ward, b.district, b.province]
+      <div className="grid gap-3 my-3">
+        <div className="space-y-1.5">
+          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Toà nhà</Label>
+          <SearchableSelect
+            options={[
+              { value: "ALL", label: "Tất cả nhà" },
+              ...buildings.map((b) => ({
+                value: b.id,
+                label: `${b.name}${
+                  [b.address, b.ward, b.district, b.province]
+                    .filter(Boolean)
+                    .join(", ")
+                    ? ` - ${[b.address, b.ward, b.district, b.province]
                         .filter(Boolean)
-                        .join(", ")
-                        ? ` - ${[b.address, b.ward, b.district, b.province]
-                            .filter(Boolean)
-                            .join(", ")}`
-                        : ""
-                    }`,
-                  })),
-                ]}
-                value={filterBuilding}
-                onValueChange={(val) => {
-                  setFilterBuilding(val || "ALL");
-                  setPage(1);
-                }}
-                placeholder="Tất cả"
-                searchPlaceholder="Tìm kiếm nhà..."
-              />
-            </div>
-            
-            <div className="space-y-2 w-full">
-              <label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                <Filter className="w-4 h-4" /> Trạng thái
-              </label>
-              <Select value={filterStatus} onValueChange={(val) => { setFilterStatus(val || "ALL"); setPage(1); }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Tất cả">
-                    {filterStatus === "ALL" ? "Tất cả" : 
-                     filterStatus === "EMPTY" ? "Phòng trống" :
-                     filterStatus === "DEPOSITED" ? "Đã cọc" :
-                     filterStatus === "OCCUPIED" ? "Đang ở" : "Tất cả"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Tất cả</SelectItem>
-                  <SelectItem value="EMPTY">Phòng trống</SelectItem>
-                  <SelectItem value="DEPOSITED">Đã cọc</SelectItem>
-                  <SelectItem value="OCCUPIED">Đang ở</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                        .join(", ")}`
+                    : ""
+                }`,
+                displayLabel: b.name,
+              })),
+            ]}
+            value={filterBuilding}
+            onValueChange={(val) => {
+              setFilterBuilding(val || "ALL");
+              setPage(1);
+            }}
+            placeholder="Tất cả nhà"
+            searchPlaceholder="Tìm kiếm nhà..."
+            className="bg-background rounded-xl w-full h-10"
+          />
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex overflow-x-auto hide-scrollbar gap-2 mb-6 pb-2">
+        <Button 
+          variant={filterStatus === "ALL" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "ALL" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => { setFilterStatus("ALL"); setPage(1); }}
+        >
+          Tất cả
+        </Button>
+        <Button 
+          variant={filterStatus === "EMPTY" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "EMPTY" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => { setFilterStatus("EMPTY"); setPage(1); }}
+        >
+          Phòng trống
+        </Button>
+        <Button 
+          variant={filterStatus === "DEPOSITED" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "DEPOSITED" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => { setFilterStatus("DEPOSITED"); setPage(1); }}
+        >
+          Đã cọc
+        </Button>
+        <Button 
+          variant={filterStatus === "OCCUPIED" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "OCCUPIED" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => { setFilterStatus("OCCUPIED"); setPage(1); }}
+        >
+          Đang ở
+        </Button>
+      </div>
 
       {/* Room List */}
       {loading ? (
@@ -199,47 +206,49 @@ export default function RoomsPage() {
           <p className="text-muted-foreground">Không tìm thấy phòng nào phù hợp với bộ lọc hiện tại.</p>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {rooms.map((room) => (
-            <Card key={room.id} className="hover:shadow-md transition-shadow flex flex-col h-full border-l-4 border-l-primary">
-              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                <div>
-                  <CardTitle className="text-xl font-bold">{room.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-0.5">
+            <Card key={room.id} className="hover:shadow-md transition-shadow bg-card border shadow-sm rounded-xl overflow-hidden flex flex-col h-full p-0 gap-0">
+              <div className="bg-primary/5 border-b border-primary/10 px-3 py-2.5 sm:px-4 sm:py-3">
+                <div className="font-semibold text-primary truncate text-sm sm:text-base">
+                  {room.name}
+                </div>
+              </div>
+              
+              <CardContent className="px-2.5 sm:px-4 pb-3 pt-3 flex-1 flex flex-col space-y-2.5">
+                <div className="flex-1 space-y-1.5">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">
                     {room.floor ? `${buildings.find(b => b.id === room.floor.building_id)?.name || ""} - ${room.floor.name}` : "Chưa xếp tầng"}
                   </p>
-                </div>
-                {getStatusBadge(room.status)}
-              </CardHeader>
-              
-              <CardContent className="flex-1 flex flex-col">
-                <div className="flex-1 mb-4 space-y-1.5">
-                  <p className="text-sm">
+                  <p className="text-xs sm:text-sm">
                     <span className="text-muted-foreground">Giá thuê: </span>
                     <span className="font-semibold text-primary">{formatCurrency(room.base_rent)}</span>
                   </p>
                   {room.room_class && (
-                    <p className="text-sm text-muted-foreground">Loại: {room.room_class.name}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate">Loại: {room.room_class.name}</p>
                   )}
+                  <div className="pt-1.5">
+                    {getStatusBadge(room.status)}
+                  </div>
                 </div>
                 
                 {(room.status === "EMPTY" || room.status === "DEPOSITED") && (
                   <Button 
                     variant="default" 
-                    className="w-full mt-auto" 
+                    className="w-full mt-auto px-2" 
                     onClick={() => router.push(`/contracts/new?building_id=${room.floor?.building_id}&room_id=${room.id}`)}
                   >
-                    <FileSignature className="w-4 h-4 mr-2" />
-                    Ký hợp đồng
+                    <FileSignature className="w-4 h-4 mr-1 sm:mr-2 shrink-0" />
+                    <span className="truncate">Ký hợp đồng</span>
                   </Button>
                 )}
                 {room.status === "OCCUPIED" && (
                   <Button 
                     variant="secondary" 
-                    className="w-full mt-auto opacity-50 cursor-not-allowed" 
+                    className="w-full mt-auto opacity-50 cursor-not-allowed px-2" 
                     disabled
                   >
-                    Đã có người ở
+                    <span className="truncate">Đã có người ở</span>
                   </Button>
                 )}
               </CardContent>

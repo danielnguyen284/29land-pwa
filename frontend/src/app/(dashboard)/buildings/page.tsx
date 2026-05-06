@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Plus, Loader2, ChevronRight } from "lucide-react";
+import { Building2, Plus, Loader2, Search, MapPin, Home, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ export default function BuildingsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [userRole, setUserRole] = useState<string>("");
+  const [filterSearch, setFilterSearch] = useState("");
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -54,7 +55,9 @@ export default function BuildingsPage() {
   const fetchBuildings = async (pageToFetch = page) => {
     setLoading(true);
     try {
-      const res = await apiFetch<{data: Building[], meta: any}>(`/api/buildings?page=${pageToFetch}&limit=12`);
+      let url = `/api/buildings?page=${pageToFetch}&limit=12`;
+      if (filterSearch) url += `&search=${filterSearch}`;
+      const res = await apiFetch<{data: Building[], meta: any}>(url);
       setBuildings(res.data);
       setTotalPages(res.meta.totalPages || 1);
     } catch (err) {
@@ -65,8 +68,11 @@ export default function BuildingsPage() {
   };
 
   useEffect(() => {
-    fetchBuildings(page);
-  }, [page]);
+    const timer = setTimeout(() => {
+      fetchBuildings(page);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [page, filterSearch]);
 
   return (
     <div className="md:space-y-6">
@@ -83,6 +89,22 @@ export default function BuildingsPage() {
           </Button>
         )}
         <AddBuildingWizard open={open} onOpenChange={setOpen} onSuccess={fetchBuildings} />
+      </div>
+
+      {/* Filters */}
+      <div className="grid gap-3 my-3">
+        <div className="space-y-1.5 relative">
+          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Tìm kiếm nhà</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Nhập tên nhà..."
+              className="pl-9 bg-background rounded-xl h-10 w-full"
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -109,31 +131,32 @@ export default function BuildingsPage() {
           <p className="text-muted-foreground font-medium mb-4 md:hidden">
             Tổng số nhà: {buildings.length}
           </p>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-3">
             {buildings.map((building) => (
               <Card 
                 key={building.id} 
-                className="hover:shadow-md transition-shadow cursor-pointer bg-primary/5 border-none shadow-sm rounded-xl overflow-hidden"
+                className="hover:shadow-md transition-shadow cursor-pointer bg-card border shadow-sm rounded-xl overflow-hidden p-0 gap-0 flex flex-col"
                 onClick={() => router.push(`/buildings/${building.id}`)}
               >
-                <div className="flex flex-row items-center justify-between p-4 pb-2">
-                  <div className="flex items-center gap-3">
-                    <Building2 className="h-5 w-5 text-primary" />
-                    <span className="text-base font-semibold text-foreground">{building.name}</span>
+                <div className="bg-primary/5 border-b border-primary/10 px-3 py-2.5 sm:px-4 sm:py-3">
+                  <div className="font-semibold text-primary truncate text-sm sm:text-base">
+                    {building.name}
                   </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <CardContent className="px-4 pb-4 pt-1">
-                  <p className="text-sm text-muted-foreground mb-1 line-clamp-2" title={[building.address, building.ward, building.district, building.province].filter(Boolean).join(", ")}>
-                    • {[building.address, building.ward, building.district, building.province].filter(Boolean).join(", ") || "Chưa có địa chỉ"}
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    • {building.rooms_count || 0} phòng
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <div className="text-[11px] font-medium text-emerald-600 border border-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                      Đang hoạt động
-                    </div>
+                <CardContent className="px-2.5 sm:px-4 pb-4 pt-3 space-y-2.5">
+                  <div className="flex items-center text-xs sm:text-sm text-emerald-600 font-medium">
+                    <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                    <span>Hoạt động</span>
+                  </div>
+                  <div className="flex items-start text-xs sm:text-sm text-primary font-bold">
+                    <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+                    <span>{building.rooms_count || 0} phòng</span>
+                  </div>
+                  <div className="flex items-start text-xs sm:text-sm text-muted-foreground font-medium">
+                    <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 mt-0.5 shrink-0" />
+                    <span className="line-clamp-2 leading-relaxed" title={[building.address, building.ward, building.district, building.province].filter(Boolean).join(", ")}>
+                      {[building.address, building.ward, building.district, building.province].filter(Boolean).join(", ") || "Chưa có địa chỉ"}
+                    </span>
                   </div>
                 </CardContent>
               </Card>

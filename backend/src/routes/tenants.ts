@@ -46,11 +46,18 @@ router.post("/:roomId/tenants", requireRole(UserRole.ADMIN, UserRole.OWNER, User
       await tenantRepo().update({ room_id, is_representative: true }, { is_representative: false });
     }
 
+    // Find if there is an active contract in this room to automatically link the tenant
+    const activeContract = await contractRepo().findOne({
+      where: { room_id, status: ContractStatus.ACTIVE },
+      order: { created_at: "DESC" }
+    });
+
     const tenant = tenantRepo().create({
       room_id,
+      contract_id: activeContract ? activeContract.id : undefined,
       name,
-      cccd: cccd || null,
-      phone: phone || null,
+      cccd: cccd || undefined,
+      phone: phone || undefined,
       is_representative: is_representative || false,
       status: "ACTIVE",
     });
@@ -111,7 +118,7 @@ router.get("/:roomId/contracts", async (req: AuthRequest, res: Response) => {
 router.post("/:roomId/contracts", requireRole(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER), async (req: AuthRequest, res: Response) => {
   try {
     const room_id = req.params.roomId as string;
-    const { representative_tenant_id, start_date, end_date, rent_amount, deposit_amount, document_photos } = req.body;
+    const { representative_tenant_id, start_date, end_date, rent_amount, deposit_amount, document_photos, tenant_ids } = req.body;
 
     if (!representative_tenant_id || !start_date || !end_date) {
       res.status(400).json({ message: "representative_tenant_id, start_date, end_date là bắt buộc" });
@@ -130,6 +137,19 @@ router.post("/:roomId/contracts", requireRole(UserRole.ADMIN, UserRole.OWNER, Us
     });
 
     const saved = await contractRepo().save(contract);
+
+    // Link provided tenant_ids and the representative tenant to this contract
+    const idsToAssign = Array.isArray(tenant_ids) ? [...tenant_ids] : [];
+    if (!idsToAssign.includes(representative_tenant_id)) {
+      idsToAssign.push(representative_tenant_id);
+    }
+    if (idsToAssign.length > 0) {
+      await AppDataSource.createQueryBuilder()
+        .update(Tenant)
+        .set({ contract_id: saved.id })
+        .where("id IN (:...ids)", { ids: idsToAssign })
+        .execute();
+    }
 
     // Update room status to OCCUPIED
     await roomRepo().update(room_id, { status: RoomStatus.OCCUPIED });
@@ -181,13 +201,14 @@ router.post("/:roomId/contracts/:contractId/terminate", requireRole(UserRole.ADM
     contract.status = ContractStatus.TERMINATED;
     contract.refunded_deposit = refund;
     contract.actual_end_date = actual_end_date || new Date().toISOString().split("T")[0];
+    if (notes) contract.notes = notes;
     await contractRepo().save(contract);
 
     // Set room to EMPTY
     await roomRepo().update(contract.room_id, { status: RoomStatus.EMPTY });
 
-    // Deactivate all tenants in the room
-    await tenantRepo().update({ room_id: contract.room_id }, { status: "INACTIVE" });
+    // Deactivate ONLY tenants in this specific contract
+    await tenantRepo().update({ contract_id: contract.id }, { status: "INACTIVE" });
 
     res.json({
       message: "Đã thanh lý hợp đồng",
@@ -209,14 +230,17 @@ router.post("/:roomId/contracts/:contractId/cancel", requireRole(UserRole.ADMIN,
     const contract = await contractRepo().findOneBy({ id: req.params.contractId as string });
     if (!contract) { res.status(404).json({ message: "Không tìm thấy hợp đồng" }); return; }
 
-    contract.status = ContractStatus.TERMINATED;
+    const { notes } = req.body;
+
+    contract.status = ContractStatus.CANCELLED;
+    if (notes) contract.notes = notes;
     await contractRepo().save(contract);
 
     // Set room to EMPTY
     await roomRepo().update(contract.room_id, { status: RoomStatus.EMPTY });
 
-    // Deactivate all tenants in the room
-    await tenantRepo().update({ room_id: contract.room_id }, { status: "INACTIVE" });
+    // Deactivate ONLY tenants in this specific contract
+    await tenantRepo().update({ contract_id: contract.id }, { status: "INACTIVE" });
 
     res.json({ message: "Đã hủy hợp đồng" });
   } catch (error) {
@@ -231,6 +255,17 @@ router.post("/:roomId/contracts/:contractId/reactivate", requireRole(UserRole.AD
     const contract = await contractRepo().findOneBy({ id: req.params.contractId as string });
     if (!contract) { res.status(404).json({ message: "Không tìm thấy hợp đồng" }); return; }
 
+    if (contract.status !== ContractStatus.CANCELLED) {
+      res.status(400).json({ message: "Chỉ được phép kích hoạt lại hợp đồng bị Hủy giữa chừng (CANCELLED)." });
+      return;
+    }
+
+    const room = await roomRepo().findOneBy({ id: contract.room_id });
+    if (room && room.status === RoomStatus.OCCUPIED) {
+      res.status(400).json({ message: "Phòng đang có người ở (hợp đồng khác đang hiệu lực). Không thể kích hoạt." });
+      return;
+    }
+
     const today = new Date();
     const endDate = new Date(contract.end_date);
     
@@ -239,18 +274,18 @@ router.post("/:roomId/contracts/:contractId/reactivate", requireRole(UserRole.AD
     endDate.setHours(0, 0, 0, 0);
 
     if (endDate < today) {
-      contract.status = ContractStatus.EXPIRED;
-    } else {
-      contract.status = ContractStatus.ACTIVE;
+      res.status(400).json({ message: "Hợp đồng này đã hết hạn. Vui lòng tạo hợp đồng mới." });
+      return;
     }
 
+    contract.status = ContractStatus.ACTIVE;
     await contractRepo().save(contract);
 
     // Set room to OCCUPIED
     await roomRepo().update(contract.room_id, { status: RoomStatus.OCCUPIED });
 
-    // Reactivate all tenants in the room
-    await tenantRepo().update({ room_id: contract.room_id }, { status: "ACTIVE" });
+    // Reactivate ONLY tenants in this specific contract
+    await tenantRepo().update({ contract_id: contract.id }, { status: "ACTIVE" });
 
     res.json({ message: "Đã kích hoạt lại hợp đồng", status: contract.status });
   } catch (error) {

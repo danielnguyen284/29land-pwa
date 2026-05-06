@@ -101,7 +101,8 @@ export default function MeterReadingsPage() {
 
       // Fetch rooms
       const roomsData = await apiFetch<{ data: Room[] }>(`/api/rooms?building_id=${selectedBuildingId}&limit=1000`);
-      setRooms(roomsData.data || []);
+      const occupiedRooms = (roomsData.data || []).filter((r: Room) => r.status === "OCCUPIED");
+      setRooms(occupiedRooms);
 
       // Fetch existing consumptions for current and previous period
       const consData = await apiFetch<ConsumptionRecord[]>(
@@ -120,7 +121,7 @@ export default function MeterReadingsPage() {
       if (building && building.fee_configs && roomsData.data) {
         const consumptionFees = building.fee_configs.filter((f: any) => f.type === "CONSUMPTION");
         
-        roomsData.data.forEach((room: Room) => {
+        occupiedRooms.forEach((room: Room) => {
           if (!room.service_subscriptions) return;
           
           consumptionFees.forEach((fee: any) => {
@@ -312,7 +313,7 @@ export default function MeterReadingsPage() {
                     <TableHead className="w-[100px]">Trạng thái</TableHead>
                     {consumptionFees.map((fee: FeeConfig, index: number) => (
                       <TableHead key={fee.id || `fee-${index}`} className="min-w-[280px]">
-                        {fee.name} (đ/{fee.unit_price.toLocaleString()})
+                        {fee.name} ({fee.unit_price.toLocaleString()} đ / đơn vị)
                       </TableHead>
                     ))}
                   </TableRow>

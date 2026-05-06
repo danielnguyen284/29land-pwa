@@ -39,7 +39,7 @@ interface Contract {
   end_date: string;
   rent_amount: number;
   deposit_amount: number;
-  status: "NEW" | "ACTIVE" | "EXPIRED" | "TERMINATED";
+  status: "NEW" | "ACTIVE" | "EXPIRED" | "TERMINATED" | "CANCELLED";
   document_photos: string[];
   room: {
     id: string;
@@ -78,6 +78,10 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
   const [terminateLastMonthRent, setTerminateLastMonthRent] = useState("");
   const [terminateDamageFees, setTerminateDamageFees] = useState("");
   const [terminateNotes, setTerminateNotes] = useState("");
+
+  // Cancel Dialog State
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelNotes, setCancelNotes] = useState("");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,6 +171,48 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
       fetchContractDetails();
     } catch (err) {
       alert("Lỗi thanh lý hợp đồng");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const openCancelDialog = () => {
+    setCancelNotes("");
+    setShowCancelDialog(true);
+  };
+
+  const handleCancel = async () => {
+    if (!contract) return;
+    if (!cancelNotes.trim()) {
+      alert("Vui lòng nhập lý do hủy hợp đồng");
+      return;
+    }
+    setFormLoading(true);
+    try {
+      await apiFetch(`/api/rooms/${contract.room_id}/contracts/${id}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ notes: cancelNotes })
+      });
+      setShowCancelDialog(false);
+      fetchContractDetails();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Lỗi hủy hợp đồng");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleReactivate = async () => {
+    if (!contract) return;
+    if (!confirm("Bạn có chắc chắn muốn kích hoạt lại hợp đồng này?")) return;
+    setFormLoading(true);
+    try {
+      await apiFetch(`/api/rooms/${contract.room_id}/contracts/${id}/reactivate`, {
+        method: "POST"
+      });
+      fetchContractDetails();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Lỗi kích hoạt hợp đồng");
     } finally {
       setFormLoading(false);
     }
@@ -304,20 +350,22 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
             
             <div className="space-y-2 mb-4">
               <Label>Trạng thái</Label>
-              <Select value={formStatus} onValueChange={(v) => setFormStatus(v || "")}>
-                <SelectTrigger className="w-full font-medium">
+              <Select value={formStatus} onValueChange={(v) => setFormStatus(v || "")} disabled={true}>
+                <SelectTrigger className="w-full font-medium opacity-100 disabled:cursor-default">
                   <SelectValue placeholder="Chọn trạng thái">
                     {formStatus === "NEW" ? "Mới (Đã cọc)" :
                      formStatus === "ACTIVE" ? "Còn hạn" :
                      formStatus === "EXPIRED" ? "Hết hạn" :
-                     formStatus === "TERMINATED" ? "Đã hủy/Trả phòng" : "Chọn trạng thái"}
+                     formStatus === "TERMINATED" ? "Đã thanh lý" : 
+                     formStatus === "CANCELLED" ? "Đã hủy" : "Chọn trạng thái"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NEW">Mới (Đã cọc)</SelectItem>
                   <SelectItem value="ACTIVE">Còn hạn</SelectItem>
                   <SelectItem value="EXPIRED">Hết hạn</SelectItem>
-                  <SelectItem value="TERMINATED">Đã hủy/Trả phòng</SelectItem>
+                  <SelectItem value="TERMINATED">Đã thanh lý</SelectItem>
+                  <SelectItem value="CANCELLED">Đã hủy</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -390,19 +438,28 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
             )}
           </div>
 
-          <div className="flex gap-4 pt-4 pb-10">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => router.push("/contracts")}>Hủy</Button>
-            
+          <div className="flex flex-col gap-4 pt-4 pb-10">
+            <Button type="submit" disabled={formLoading} className="w-full bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end hover:opacity-90 text-primary-foreground">
+              {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu thay đổi
+            </Button>
+
             {(formStatus === "ACTIVE" || formStatus === "NEW") && (
-              <Button type="button" variant="destructive" className="flex-1" onClick={openTerminateDialog}>
-                Thanh lý / Trả phòng
-              </Button>
+              <div className="flex gap-4">
+                <Button type="button" variant="outline" className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={openCancelDialog} disabled={formLoading}>
+                  Hủy hợp đồng
+                </Button>
+                <Button type="button" variant="destructive" className="flex-1" onClick={openTerminateDialog} disabled={formLoading}>
+                  Thanh lý / Trả phòng
+                </Button>
+              </div>
             )}
 
-            <Button type="submit" disabled={formLoading} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
-              {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Cập nhật
-            </Button>
+            {formStatus === "CANCELLED" && (
+              <Button type="button" variant="outline" className="w-full border-primary text-primary hover:bg-primary/10" onClick={handleReactivate} disabled={formLoading}>
+                Kích hoạt lại
+              </Button>
+            )}
           </div>
         </form>
       </div>
@@ -487,6 +544,30 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
             <Button variant="destructive" onClick={handleTerminate} disabled={formLoading}>
               {formLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Xác nhận trả phòng
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Cancel Modal */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Hủy hợp đồng</DialogTitle>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Lý do hủy hợp đồng <span className="text-destructive">*</span></Label>
+              <Input 
+                placeholder="Khách không đến nhận phòng, sai thông tin..."
+                value={cancelNotes} 
+                onChange={e => setCancelNotes(e.target.value)} 
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">Khách thuê sẽ bị chuyển sang không hoạt động. Bạn có thể kích hoạt lại sau này nếu cần.</p>
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>Đóng</Button>
+            <Button variant="destructive" onClick={handleCancel} disabled={formLoading}>
+              {formLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Xác nhận Hủy
             </Button>
           </div>
         </DialogContent>

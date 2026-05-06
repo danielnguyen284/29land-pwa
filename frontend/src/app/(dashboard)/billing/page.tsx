@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Receipt, Loader2, FileText, CheckCircle, AlertCircle, Eye } from "lucide-react";
@@ -124,11 +125,11 @@ export default function BillingPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "PAID":
-        return <Badge variant="default" className="bg-green-600"><CheckCircle className="mr-1 h-3 w-3"/> Đã thanh toán</Badge>;
+        return <Badge variant="default" className="bg-emerald-600 text-[10px] sm:text-xs px-1.5 py-0 sm:px-2.5 sm:py-0.5"><CheckCircle className="mr-1 h-2.5 w-2.5 sm:h-3 sm:w-3"/> Đã thu đủ</Badge>;
       case "PARTIAL":
-        return <Badge variant="secondary" className="text-orange-600 bg-orange-100 border-orange-200"><AlertCircle className="mr-1 h-3 w-3"/> Thu thiếu</Badge>;
+        return <Badge variant="secondary" className="text-amber-600 bg-amber-100 border-amber-200 text-[10px] sm:text-xs px-1.5 py-0 sm:px-2.5 sm:py-0.5"><AlertCircle className="mr-1 h-2.5 w-2.5 sm:h-3 sm:w-3"/> Thu thiếu</Badge>;
       default:
-        return <Badge variant="destructive"><AlertCircle className="mr-1 h-3 w-3"/> Chưa thanh toán</Badge>;
+        return <Badge variant="destructive" className="text-[10px] sm:text-xs px-1.5 py-0 sm:px-2.5 sm:py-0.5"><AlertCircle className="mr-1 h-2.5 w-2.5 sm:h-3 sm:w-3"/> Chưa đóng</Badge>;
     }
   };
 
@@ -152,31 +153,36 @@ export default function BillingPage() {
   return (
     <div className="space-y-6 pb-20 md:pb-0">
 
-      <div className="grid md:grid-cols-4 gap-4 p-4 border rounded-lg bg-card">
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground">Tòa nhà</label>
+      {/* Filters */}
+      <div className="grid gap-3 my-3">
+        <div className="space-y-1.5">
+          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Toà nhà</Label>
           <SearchableSelect
-            options={buildings.map((b) => ({
-              value: b.id,
-              label: `${b.name}${
-                [b.address, b.ward, b.district, b.province]
-                  .filter(Boolean)
-                  .join(", ")
-                  ? ` - ${[b.address, b.ward, b.district, b.province]
-                      .filter(Boolean)
-                      .join(", ")}`
-                  : ""
-              }`,
-              displayLabel: b.name,
-            }))}
+            options={[
+              { value: "", label: "Tất cả nhà" },
+              ...buildings.map((b) => ({
+                value: b.id,
+                label: `${b.name}${
+                  [b.address, b.ward, b.district, b.province]
+                    .filter(Boolean)
+                    .join(", ")
+                    ? ` - ${[b.address, b.ward, b.district, b.province]
+                        .filter(Boolean)
+                        .join(", ")}`
+                    : ""
+                }`,
+                displayLabel: b.name,
+              })),
+            ]}
             value={filterBuilding}
-            onValueChange={setFilterBuilding}
-            placeholder="Chọn nhà..."
+            onValueChange={(v) => setFilterBuilding(v || "")}
+            placeholder="Tất cả nhà"
             searchPlaceholder="Tìm kiếm nhà..."
+            className="bg-background rounded-xl w-full h-10"
           />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground">Phòng</label>
+        <div className="space-y-1.5">
+          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Phòng</Label>
           <SearchableSelect
             options={[
               { value: "ALL", label: "Tất cả phòng" },
@@ -187,32 +193,52 @@ export default function BillingPage() {
             ]}
             value={filterRoom}
             onValueChange={setFilterRoom}
-            placeholder="Chọn phòng..."
+            placeholder="Tất cả phòng"
             searchPlaceholder="Tìm kiếm phòng..."
+            className="bg-background rounded-xl w-full h-10"
           />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground">Kỳ hóa đơn</label>
+        <div className="space-y-1.5">
+          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Kỳ hóa đơn</Label>
           <Input 
             type="month" 
             value={filterPeriod} 
             onChange={(e) => setFilterPeriod(e.target.value)}
+            className="bg-background rounded-xl h-10 w-full"
           />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground">Trạng thái</label>
-          <Select value={filterStatus} onValueChange={(val) => val && setFilterStatus(val)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Tất cả" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tất cả trạng thái</SelectItem>
-              <SelectItem value="UNPAID">Chưa thanh toán</SelectItem>
-              <SelectItem value="PARTIAL">Thu thiếu (Một phần)</SelectItem>
-              <SelectItem value="PAID">Đã thanh toán đủ</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex overflow-x-auto hide-scrollbar gap-2 mb-6 pb-2">
+        <Button 
+          variant={filterStatus === "ALL" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "ALL" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => setFilterStatus("ALL")}
+        >
+          Tất cả
+        </Button>
+        <Button 
+          variant={filterStatus === "UNPAID" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "UNPAID" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => setFilterStatus("UNPAID")}
+        >
+          Chưa thanh toán
+        </Button>
+        <Button 
+          variant={filterStatus === "PARTIAL" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "PARTIAL" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => setFilterStatus("PARTIAL")}
+        >
+          Thu thiếu
+        </Button>
+        <Button 
+          variant={filterStatus === "PAID" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "PAID" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => setFilterStatus("PAID")}
+        >
+          Đã thanh toán
+        </Button>
       </div>
       
 
@@ -230,41 +256,47 @@ export default function BillingPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {invoices.map((inv) => (
-            <Card key={inv.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <div className={`h-1.5 w-full ${inv.status === 'PAID' ? 'bg-green-500' : inv.status === 'PARTIAL' ? 'bg-orange-500' : 'bg-red-500'}`} />
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start mb-1">
-                  <Badge variant="outline" className="font-normal text-xs">{formatPeriod(inv.billing_period)}</Badge>
+            <Card key={inv.id} className="hover:shadow-md transition-shadow bg-card border shadow-sm rounded-xl overflow-hidden flex flex-col h-full p-0 gap-0">
+              <div className="bg-primary/5 border-b border-primary/10 px-3 py-2.5 sm:px-4 sm:py-3">
+                <div className="font-semibold text-primary truncate text-sm sm:text-base">
+                  {inv.room?.name || "Phòng ?"}
+                </div>
+              </div>
+              
+              <CardContent className="px-2.5 sm:px-4 pb-3 pt-3 flex-1 flex flex-col space-y-2.5">
+                <div className="flex justify-between items-center pb-1">
+                  <Badge variant="outline" className="font-normal text-[10px] sm:text-xs bg-background px-1.5 py-0 sm:px-2.5 sm:py-0.5">{formatPeriod(inv.billing_period)}</Badge>
                   {getStatusBadge(inv.status)}
                 </div>
-                <CardTitle className="text-xl">{inv.room?.name || "Phòng ?"}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 pb-3">
-                <div className="flex justify-between items-center py-1 border-b border-dashed">
-                  <span className="text-sm text-muted-foreground">Tổng tiền:</span>
-                  <span className="font-semibold text-lg">{formatCurrency(inv.total_amount)}</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-dashed">
-                  <span className="text-sm text-muted-foreground">Đã thanh toán:</span>
-                  <span className="font-medium text-green-600">{formatCurrency(inv.paid_amount)}</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm text-muted-foreground">Còn nợ:</span>
-                  <span className="font-medium text-red-600">
-                    {formatCurrency(Math.max(0, Number(inv.total_amount) - Number(inv.paid_amount)))}
-                  </span>
+                
+                <div className="grid gap-1.5 sm:gap-2 text-xs sm:text-sm flex-1">
+                  <div className="flex justify-between items-center py-1 border-b border-dashed">
+                    <span className="text-muted-foreground truncate mr-2">Tổng:</span>
+                    <span className="font-semibold shrink-0">{formatCurrency(inv.total_amount)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-dashed">
+                    <span className="text-muted-foreground truncate mr-2">Đã thu:</span>
+                    <span className="font-medium text-emerald-600 shrink-0">{formatCurrency(inv.paid_amount)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-muted-foreground truncate mr-2">Nợ:</span>
+                    <span className="font-medium text-destructive shrink-0">
+                      {formatCurrency(Math.max(0, Number(inv.total_amount) - Number(inv.paid_amount)))}
+                    </span>
+                  </div>
                 </div>
               </CardContent>
-              <CardFooter className="pt-2 bg-muted/10">
+              
+              <CardFooter className="pt-0 border-t bg-muted/20 p-2 sm:p-3">
                 <Button 
                   variant="ghost" 
-                  className="w-full text-primary hover:bg-primary/10" 
+                  className="w-full h-8 text-xs sm:text-sm text-primary" 
                   onClick={() => router.push(`/billing/${inv.id}`)}
                 >
-                  <Eye className="mr-2 h-4 w-4" />
-                  Xem chi tiết & Cập nhật
+                  <Eye className="mr-2 h-3.5 w-3.5" />
+                  Xem chi tiết
                 </Button>
               </CardFooter>
             </Card>

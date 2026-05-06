@@ -15,6 +15,7 @@ export enum ContractStatus {
   ACTIVE = "ACTIVE",
   EXPIRED = "EXPIRED",
   TERMINATED = "TERMINATED",
+  CANCELLED = "CANCELLED",
 }
 
 @Entity("contracts")
@@ -59,6 +60,9 @@ export class Contract {
 
   @Column({ type: "jsonb", default: [] })
   document_photos!: string[];
+
+  @Column({ type: "text", nullable: true })
+  notes!: string | null;
 
   @CreateDateColumn()
   created_at!: Date;

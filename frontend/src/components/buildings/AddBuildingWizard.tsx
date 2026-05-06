@@ -492,17 +492,17 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
             <div className="absolute top-1.5 left-12 right-12 h-1 bg-muted -z-0"></div>
             
             <div className="flex flex-col items-center z-10 gap-2">
-              <div className={`w-3.5 h-3.5 rounded-full ${step >= 1 ? 'bg-primary' : 'bg-muted'}`}></div>
+              <div className={`w-3.5 h-3.5 rounded-full ${step >= 1 ? 'bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end' : 'bg-muted'}`}></div>
               <span className={`text-xs ${step === 1 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>Cơ bản</span>
             </div>
             
             <div className="flex flex-col items-center z-10 gap-2">
-              <div className={`w-3.5 h-3.5 rounded-full ${step >= 2 ? 'bg-primary' : 'bg-muted'}`}></div>
+              <div className={`w-3.5 h-3.5 rounded-full ${step >= 2 ? 'bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end' : 'bg-muted'}`}></div>
               <span className={`text-xs ${step === 2 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>Bổ sung</span>
             </div>
             
             <div className="flex flex-col items-center z-10 gap-2">
-              <div className={`w-3.5 h-3.5 rounded-full ${step >= 3 ? 'bg-primary' : 'bg-muted'}`}></div>
+              <div className={`w-3.5 h-3.5 rounded-full ${step >= 3 ? 'bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end' : 'bg-muted'}`}></div>
               <span className={`text-xs ${step === 3 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>Tạo phòng</span>
             </div>
           </div>
@@ -1033,7 +1033,7 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
                                   handleUpdateRoomService(fee.id, e.target.checked, overridePriceStr);
                                 }}
                               />
-                              <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                              <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-primary-gradient-start peer-checked:to-primary-gradient-end"></div>
                             </label>
                           </div>
                           

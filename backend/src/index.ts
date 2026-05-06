@@ -14,6 +14,9 @@ import reportRoutes from "./routes/reports";
 import billingRoutes from "./routes/billing";
 import contractRoutes from "./routes/contracts";
 import uploadRoutes from "./routes/upload";
+import { IsNull } from "typeorm";
+import { Tenant } from "./entities/Tenant";
+import { Contract } from "./entities/Contract";
 import { syncExpiredContracts } from "./cron/contracts";
 import { autoGenerateInvoices } from "./cron/billing";
 
@@ -52,6 +55,32 @@ AppDataSource.initialize()
     await syncExpiredContracts();
     // Run invoice generation check on startup
     await autoGenerateInvoices();
+    
+    // Data Migration for Tenants
+    try {
+      const tenantRepo = AppDataSource.getRepository(Tenant);
+      const contractRepo = AppDataSource.getRepository(Contract);
+      const tenantsWithoutContract = await tenantRepo.find({ where: { contract_id: IsNull() } });
+      if (tenantsWithoutContract.length > 0) {
+        console.log(`Found ${tenantsWithoutContract.length} tenants without contract_id. Migrating...`);
+        const rooms = [...new Set(tenantsWithoutContract.map(t => t.room_id))];
+        for (const roomId of rooms) {
+          const latestContract = await contractRepo.findOne({
+            where: { room_id: roomId },
+            order: { created_at: "DESC" }
+          });
+          if (latestContract) {
+            await tenantRepo.update(
+              { room_id: roomId, contract_id: IsNull() },
+              { contract_id: latestContract.id }
+            );
+          }
+        }
+        console.log("Migration complete.");
+      }
+    } catch (e) {
+      console.error("Migration error:", e);
+    }
     
     // Set up hourly cron job (3600000 ms)
     setInterval(() => {
