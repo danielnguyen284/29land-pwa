@@ -14,10 +14,11 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
   turbopack: {},
   async rewrites() {
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || "http://backend:3001";
     return [
       {
         source: "/api/:path*",
-        destination: "http://backend:3001/api/:path*", // Proxy to backend container inside Dokploy
+        destination: `${backendUrl}/api/:path*`, // Proxy to backend container inside Dokploy
       },
     ];
   },
