@@ -25,7 +25,7 @@ export class Tenant {
   @Column({ nullable: true })
   contract_id!: string;
 
-  @ManyToOne(() => Contract)
+  @ManyToOne(() => Contract, contract => contract.tenants)
   @JoinColumn({ name: "contract_id" })
   contract!: Contract;
 

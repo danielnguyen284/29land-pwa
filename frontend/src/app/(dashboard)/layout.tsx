@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PushNotificationHandler } from "@/components/PushNotificationHandler";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 const navItems = [
   { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard, roles: ["ADMIN", "MANAGER", "OWNER"] },
@@ -37,8 +38,22 @@ const navItems = [
   { href: "/contracts", label: "Hợp đồng", icon: FileSignature, roles: ["ADMIN", "MANAGER"] },
   { href: "/meter-readings", label: "Chốt số", icon: ClipboardType, roles: ["ADMIN", "MANAGER"] },
   { href: "/billing", label: "Hóa đơn", icon: Receipt, roles: ["ADMIN", "MANAGER"] },
-  { href: "/tickets", label: "Bảo trì", icon: Wrench, roles: ["ADMIN", "MANAGER", "TECHNICIAN"] },
+  { href: "/tickets", label: "Công việc", icon: Wrench, roles: ["ADMIN", "MANAGER", "TECHNICIAN"] },
 ];
+
+const BrandLogo = ({ className = "" }: { className?: string }) => (
+  <div className={`flex items-center gap-2.5 ${className}`}>
+    <Building2 className="h-7 w-7 text-primary shrink-0" />
+    <div className="flex flex-col text-left">
+      <span className="text-sm font-bold tracking-wide text-primary leading-snug">
+        Quản lý & Vận hành 29LAND
+      </span>
+      <span className="text-[8px] font-bold text-muted-foreground/80 mt-0.5 uppercase tracking-widest">
+        by Hoàng Dũng
+      </span>
+    </div>
+  </div>
+);
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -86,10 +101,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <ArrowLeft className="h-6 w-6" />
               </Button>
             )}
-            <div className="flex items-center gap-2 font-bold text-primary text-lg sm:text-xl">
-              <Wrench className="h-5 w-5 sm:h-6 sm:w-6" />
-              <span className="hidden sm:inline">29LAND Kỹ thuật viên</span>
-              <span className="sm:hidden">Kỹ thuật viên</span>
+            <div className="flex items-center gap-2">
+              <BrandLogo />
             </div>
           </div>
           
@@ -142,9 +155,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 flex-col border-r bg-background md:flex">
         <div className="flex h-14 items-center border-b px-4 lg:h-[60px]">
-          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-primary text-xl">
-            <Building2 className="h-6 w-6" />
-            <span>29LAND</span>
+          <Link href="/dashboard" className="flex items-center">
+            <BrandLogo />
           </Link>
         </div>
         <div className="flex-1 overflow-auto py-4">
@@ -170,15 +182,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Mobile Header & Menu */}
       {pathname === "/dashboard" ? (
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background px-4 md:hidden">
-          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-primary text-xl">
-            <Building2 className="h-6 w-6" />
-            <span>29LAND</span>
+          <Link href="/dashboard" className="flex items-center">
+            <BrandLogo />
           </Link>
           <div className="flex items-center">
-            <div className="relative cursor-pointer mr-2 text-muted-foreground hover:text-foreground">
-              <Bell className="h-6 w-6" />
-              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-background rounded-full"></span>
-            </div>
+            <NotificationCenter />
             <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
               {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>
@@ -209,7 +217,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <ArrowLeft className="h-6 w-6" />
           </Button>
           <span className="font-bold text-lg text-primary flex-1 text-center">
-            {pathname === "/tickets/new" ? "Tạo phiếu sửa chữa" 
+            {pathname === "/tickets/new" ? "Tạo phiếu công việc" 
             : pathname === "/reports" ? "Thống kê & Báo cáo" 
             : navItems.find(item => pathname.startsWith(item.href) && item.href !== "/dashboard")?.label || "Chi tiết"}
           </span>
@@ -296,7 +304,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </nav>
             
             <div className="mt-auto p-4 text-center text-xs text-muted-foreground">
-              v1.0.0 (29LAND)
+              v1.0.0 (29LAND by Hoàng Dũng)
             </div>
           </div>
         </>

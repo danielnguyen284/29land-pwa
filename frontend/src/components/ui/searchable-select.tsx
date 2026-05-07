@@ -23,6 +23,7 @@ export interface SearchableSelectOption {
   value: string;
   label: string;
   displayLabel?: string;
+  disabled?: boolean;
 }
 
 interface SearchableSelectProps {
@@ -86,7 +87,9 @@ export function SearchableSelect({
                   key={option.value}
                   // Combine label and value to ensure uniqueness while remaining searchable by label
                   value={`${option.label}:::${option.value}`}
+                  disabled={option.disabled}
                   onSelect={() => {
+                    if (option.disabled) return;
                     onValueChange(option.value)
                     setOpen(false)
                   }}

@@ -14,7 +14,9 @@ export interface LoginResponse {
 
 export interface Ticket {
   id: string;
-  room_id: string;
+  building_id: string;
+  building?: any;
+  room_id?: string | null;
   room?: any; // could be typed fully if needed
   created_by: string;
   creator?: User;
@@ -22,6 +24,8 @@ export interface Ticket {
   assigned_tech?: User;
   title: string;
   description: string | null;
+  priority: string;
+  evidence_photos: string[];
   status: "PENDING" | "IN_PROGRESS" | "WAITING_APPROVAL" | "NEEDS_EXPLANATION" | "COMPLETED" | "OVERDUE";
   created_at: string;
   updated_at: string;

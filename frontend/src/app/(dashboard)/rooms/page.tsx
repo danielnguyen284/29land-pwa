@@ -119,7 +119,7 @@ export default function RoomsPage() {
       case "DEPOSITED":
         return <span className="text-xs font-medium bg-yellow-100 text-yellow-700 px-2 py-1 rounded-md">Đã cọc</span>;
       case "OCCUPIED":
-        return <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md">Đang ở</span>;
+        return <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md">Đang thuê</span>;
       default:
         return null;
     }
@@ -136,19 +136,14 @@ export default function RoomsPage() {
           <SearchableSelect
             options={[
               { value: "ALL", label: "Tất cả nhà" },
-              ...buildings.map((b) => ({
-                value: b.id,
-                label: `${b.name}${
-                  [b.address, b.ward, b.district, b.province]
-                    .filter(Boolean)
-                    .join(", ")
-                    ? ` - ${[b.address, b.ward, b.district, b.province]
-                        .filter(Boolean)
-                        .join(", ")}`
-                    : ""
-                }`,
-                displayLabel: b.name,
-              })),
+              ...buildings.map((b) => {
+                const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+                return {
+                  value: b.id,
+                  label: fullAddress,
+                  displayLabel: fullAddress,
+                };
+              }),
             ]}
             value={filterBuilding}
             onValueChange={(val) => {
@@ -190,7 +185,7 @@ export default function RoomsPage() {
           className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "OCCUPIED" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
           onClick={() => { setFilterStatus("OCCUPIED"); setPage(1); }}
         >
-          Đang ở
+          Đang thuê
         </Button>
       </div>
 
@@ -248,7 +243,7 @@ export default function RoomsPage() {
                     className="w-full mt-auto opacity-50 cursor-not-allowed px-2" 
                     disabled
                   >
-                    <span className="truncate">Đã có người ở</span>
+                    <span className="truncate">Đang thuê</span>
                   </Button>
                 )}
               </CardContent>

@@ -30,6 +30,13 @@ const statusConfig = {
   OVERDUE: { label: "Quá hạn", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300", badgeColor: "bg-red-100 text-red-700", icon: AlertCircle },
 };
 
+const priorityConfig: Record<string, { label: string, color: string }> = {
+  LOW: { label: "Thấp", color: "bg-slate-100 text-slate-700" },
+  MEDIUM: { label: "Trung bình", color: "bg-blue-100 text-blue-700" },
+  HIGH: { label: "Cao", color: "bg-orange-100 text-orange-700" },
+  URGENT: { label: "Khẩn cấp", color: "bg-rose-100 text-rose-700 border-rose-200" },
+};
+
 export default function TicketsPage() {
   const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -38,6 +45,7 @@ export default function TicketsPage() {
   const [userRole, setUserRole] = useState<string>("");
 
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [filterPriority, setFilterPriority] = useState<string>("ALL");
   const [filterBuilding, setFilterBuilding] = useState<string>("ALL");
   const [buildings, setBuildings] = useState<{ id: string; name: string; address?: string; ward?: string; district?: string; province?: string; }[]>([]);
   const [page, setPage] = useState(1);
@@ -74,6 +82,9 @@ export default function TicketsPage() {
       if (filterStatus !== "ALL") {
         url += `&status=${filterStatus}`;
       }
+      if (filterPriority !== "ALL") {
+        url += `&priority=${filterPriority}`;
+      }
       if (filterBuilding !== "ALL") {
         url += `&building_id=${filterBuilding}`;
       }
@@ -100,7 +111,7 @@ export default function TicketsPage() {
 
   useEffect(() => {
     fetchTickets();
-  }, [page, filterStatus, filterBuilding]);
+  }, [page, filterStatus, filterPriority, filterBuilding]);
 
   if (error) {
     return (
@@ -117,28 +128,28 @@ export default function TicketsPage() {
     return <span className={`text-xs font-medium px-2 py-1 rounded-md ${conf.badgeColor}`}>{conf.label}</span>;
   };
 
+  const getPriorityBadge = (priority: string) => {
+    const conf = priorityConfig[priority] || priorityConfig["MEDIUM"];
+    return <span className={`text-[10px] font-medium px-2 py-0.5 rounded-sm border ${conf.color}`}>{conf.label}</span>;
+  };
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto flex flex-col min-h-[calc(100vh-140px)]">
       {/* Filters */}
-      <div className="grid gap-3 my-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 my-3">
         <div className="space-y-1.5">
           <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Toà nhà</Label>
           <SearchableSelect
             options={[
               { value: "ALL", label: "Tất cả nhà" },
-              ...buildings.map((b) => ({
-                value: b.id,
-                label: `${b.name}${
-                  [b.address, b.ward, b.district, b.province]
-                    .filter(Boolean)
-                    .join(", ")
-                    ? ` - ${[b.address, b.ward, b.district, b.province]
-                        .filter(Boolean)
-                        .join(", ")}`
-                    : ""
-                }`,
-                displayLabel: b.name,
-              })),
+              ...buildings.map((b) => {
+                const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+                return {
+                  value: b.id,
+                  label: fullAddress,
+                  displayLabel: fullAddress,
+                };
+              }),
             ]}
             value={filterBuilding}
             onValueChange={(val) => {
@@ -150,6 +161,28 @@ export default function TicketsPage() {
             className="bg-background rounded-xl w-full h-10"
           />
         </div>
+
+        {["MANAGER", "OWNER", "ADMIN"].includes(userRole) && (
+          <div className="space-y-1.5">
+            <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Mức độ ưu tiên</Label>
+            <SearchableSelect
+              options={[
+                { value: "ALL", label: "Tất cả mức độ" },
+                { value: "LOW", label: "Thấp" },
+                { value: "MEDIUM", label: "Trung bình" },
+                { value: "HIGH", label: "Cao" },
+                { value: "URGENT", label: "Khẩn cấp" },
+              ]}
+              value={filterPriority}
+              onValueChange={(val) => {
+                setFilterPriority(val || "ALL");
+                setPage(1);
+              }}
+              placeholder="Tất cả mức độ"
+              className="bg-background rounded-xl w-full h-10"
+            />
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -205,7 +238,7 @@ export default function TicketsPage() {
       ) : tickets.length === 0 ? (
         <div className="flex flex-col items-center justify-center flex-1 h-[40vh] border-2 border-dashed rounded-xl bg-muted/20 text-muted-foreground gap-3">
           <Wrench className="h-12 w-12 opacity-20" />
-          <p className="font-medium">Không có phiếu sửa chữa nào</p>
+          <p className="font-medium">Không có phiếu công việc nào</p>
         </div>
       ) : (
         <div className="flex-1 pb-20 md:pb-0">
@@ -218,18 +251,21 @@ export default function TicketsPage() {
                   onClick={() => router.push(`/tickets/${ticket.id}`)}
                 >
                   <div className={`border-b px-3 py-2.5 sm:px-4 sm:py-3 ${ticket.status === 'COMPLETED' ? 'bg-emerald-500/10 border-emerald-500/20' : ticket.status === 'NEEDS_EXPLANATION' ? 'bg-rose-500/10 border-rose-500/20' : 'bg-primary/5 border-primary/10'}`}>
-                    <div className={`font-semibold truncate text-sm sm:text-base ${ticket.status === 'COMPLETED' ? 'text-emerald-700' : ticket.status === 'NEEDS_EXPLANATION' ? 'text-rose-700' : 'text-primary'}`}>
-                      {ticket.title}
+                    <div className="flex justify-between items-start gap-2">
+                      <div className={`font-semibold truncate text-sm sm:text-base ${ticket.status === 'COMPLETED' ? 'text-emerald-700' : ticket.status === 'NEEDS_EXPLANATION' ? 'text-rose-700' : 'text-primary'}`}>
+                        {ticket.title}
+                      </div>
+                      {getPriorityBadge(ticket.priority)}
                     </div>
                   </div>
                   
                   <CardContent className="px-2.5 sm:px-4 pb-3 pt-3 flex-1 flex flex-col space-y-2.5">
                     <div className="flex-1 space-y-1.5">
                       <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                        Phòng: {ticket.room?.name || "N/A"}
+                        Tòa nhà: <span className="font-medium text-foreground">{ticket.building?.name || "N/A"}</span> {ticket.room ? `- P.${ticket.room.name}` : ""}
                       </p>
                       <p className="text-[11px] sm:text-xs">
-                        <span className="text-muted-foreground">Kỹ thuật viên: </span>
+                        <span className="text-muted-foreground">Người phụ trách: </span>
                         <span className="font-semibold text-primary truncate max-w-[100px] inline-block align-bottom">{ticket.assigned_tech?.name || "Chưa gán"}</span>
                       </p>
                       <p className="text-[11px] sm:text-xs text-muted-foreground">

@@ -44,6 +44,15 @@ export class TicketExpense {
   @Column({ type: "text", nullable: true })
   technician_comment!: string;
 
+  @Column({ nullable: true })
+  created_by!: string;
+
+  @Column({ nullable: true })
+  approved_by!: string;
+
+  @Column({ type: "timestamp", nullable: true })
+  approved_at!: Date;
+
   @CreateDateColumn()
   created_at!: Date;
 }

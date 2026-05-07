@@ -31,6 +31,7 @@ import {
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api";
+import { intervalToDuration, isBefore } from "date-fns";
 
 interface Building {
   id: string;
@@ -205,7 +206,25 @@ export default function ContractsPage() {
 
   const isExpiredLocally = (endDateStr: string) => {
     const end = new Date(endDateStr);
-    return end < today;
+    return isBefore(end, today);
+  };
+
+  const getRemainingTimeLabel = (endDateStr: string) => {
+    const end = new Date(endDateStr);
+    if (isBefore(end, today)) return "Hết hạn";
+    
+    const duration = intervalToDuration({ 
+      start: today, 
+      end: end 
+    });
+    
+    const parts = [];
+    if (duration.years) parts.push(`${duration.years} năm`);
+    if (duration.months) parts.push(`${duration.months} tháng`);
+    if (duration.days) parts.push(`${duration.days} ngày`);
+    
+    if (parts.length === 0) return "Hết hạn hôm nay";
+    return `Còn hạn: ${parts.join(" ")}`;
   };
 
   const filteredContracts = useMemo(() => {
@@ -279,19 +298,14 @@ export default function ContractsPage() {
             <SearchableSelect
               options={[
                 { value: "Tất cả", label: "Tất cả nhà" },
-                ...buildings.map((b) => ({
-                  value: b.id,
-                  label: `${b.name}${
-                    [b.address, b.ward, b.district, b.province]
-                      .filter(Boolean)
-                      .join(", ")
-                      ? ` - ${[b.address, b.ward, b.district, b.province]
-                          .filter(Boolean)
-                          .join(", ")}`
-                      : ""
-                  }`,
-                  displayLabel: b.name,
-                })),
+                ...buildings.map((b) => {
+                  const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+                  return {
+                    value: b.id,
+                    label: fullAddress,
+                    displayLabel: fullAddress,
+                  };
+                }),
               ]}
               value={selectedBuildingId}
               onValueChange={(v) => setSelectedBuildingId(v || "Tất cả")}
@@ -438,7 +452,7 @@ export default function ContractsPage() {
                   ) : c.status === "ACTIVE" ? (
                     <div className="flex items-center text-xs sm:text-sm text-emerald-600 font-medium">
                       <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
-                      <span>Còn hạn</span>
+                      <span>{getRemainingTimeLabel(c.end_date)}</span>
                     </div>
                   ) : c.status === "NEW" ? (
                     <div className="flex items-center text-xs sm:text-sm text-blue-600 font-medium">

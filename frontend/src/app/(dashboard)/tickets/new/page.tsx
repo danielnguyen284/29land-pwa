@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Upload, X, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
+import { useRef } from "react";
 
 interface Building {
   id: string;
@@ -38,9 +40,11 @@ export default function NewTicketPage() {
   const [buildings, setBuildings] = useState<{ value: string; label: string }[]>([]);
   const [rooms, setRooms] = useState<{ value: string; label: string }[]>([]);
   const [techs, setTechs] = useState<{ value: string; label: string }[]>([]);
+  const [allTechs, setAllTechs] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [userRole, setUserRole] = useState<string>("");
 
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
 
@@ -49,9 +53,64 @@ export default function NewTicketPage() {
     assigned_tech_id: "",
     title: "",
     description: "",
+    priority: "MEDIUM",
   });
 
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const removePhoto = (index: number) => {
+    const newPhotos = [...photos];
+    newPhotos.splice(index, 1);
+    setPhotos(newPhotos);
+  };
+
+  const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    if (photos.length + files.length > 5) {
+      toast.error("Chỉ được tải tối đa 5 ảnh bằng chứng");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setUploading(true);
+    const newPhotos = [...photos];
+    try {
+      for (let i = 0; i < files.length; i++) {
+        if (newPhotos.length >= 5) break;
+        const file = files[i];
+        const reader = new FileReader();
+        
+        const base64 = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+
+        const res = await apiFetch<{url: string}>("/api/upload", {
+          method: "POST",
+          body: JSON.stringify({ image: base64 })
+        });
+        
+        newPhotos.push(res.url);
+      }
+      setPhotos(newPhotos);
+    } catch (err) {
+      toast.error("Lỗi upload ảnh");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      setUserRole(JSON.parse(userStr).role);
+    }
+
     const fetchInitialData = async () => {
       try {
         const [buildingsData, usersData] = await Promise.all([
@@ -60,26 +119,23 @@ export default function NewTicketPage() {
         ]);
 
         setBuildings(
-          buildingsData.data.map((b) => ({
-            value: b.id,
-            label: `${b.name}${
-              [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ")
-                ? ` - ${[b.address, b.ward, b.district, b.province]
-                    .filter(Boolean)
-                    .join(", ")}`
-                : ""
-            }`,
-            displayLabel: b.name,
-          }))
+          buildingsData.data.map((b) => {
+            const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+            return {
+              value: b.id,
+              label: fullAddress,
+              displayLabel: fullAddress,
+            };
+          })
         );
 
+        const filteredTechs = usersData.filter((u) => u.role === "TECHNICIAN");
+        setAllTechs(filteredTechs);
         setTechs(
-          usersData
-            .filter((u) => u.role === "TECHNICIAN")
-            .map((u) => ({
-              value: u.id,
-              label: u.name,
-            }))
+          filteredTechs.map((u) => ({
+            value: u.id,
+            label: `${u.name} (Kỹ thuật)`,
+          }))
         );
       } catch (err: any) {
         toast.error("Lỗi tải dữ liệu: " + err.message);
@@ -100,13 +156,23 @@ export default function NewTicketPage() {
 
       setRoomsLoading(true);
       try {
-        const res = await apiFetch<{data: Room[], meta: any}>(`/api/rooms?limit=1000&building_id=${selectedBuildingId}`);
+        const [resRooms, resManagers] = await Promise.all([
+          apiFetch<{data: Room[], meta: any}>(`/api/rooms?limit=1000&building_id=${selectedBuildingId}`),
+          apiFetch<User[]>(`/api/buildings/${selectedBuildingId}/managers`)
+        ]);
+
         setRooms(
-          res.data.map((r) => ({
+          resRooms.data.map((r) => ({
             value: r.id,
             label: `${r.floor ? r.floor.name + " - " : ""}${r.name}`,
           }))
         );
+
+        setTechs([
+          ...resManagers.map((m) => ({ value: m.id, label: `${m.name} (Quản lý)` })),
+          ...allTechs.map((u) => ({ value: u.id, label: `${u.name} (Kỹ thuật)` }))
+        ]);
+
         // Reset room selection when building changes
         setFormData(prev => ({ ...prev, room_id: "" }));
       } catch (err: any) {
@@ -115,14 +181,13 @@ export default function NewTicketPage() {
         setRoomsLoading(false);
       }
     };
-
     fetchRoomsForBuilding();
-  }, [selectedBuildingId]);
+  }, [selectedBuildingId, allTechs]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.room_id || !formData.title) {
-      toast.error("Vui lòng nhập đầy đủ phòng và tiêu đề sự cố");
+    if (!selectedBuildingId || !formData.title) {
+      toast.error("Vui lòng chọn tòa nhà và nhập tiêu đề công việc");
       return;
     }
 
@@ -130,9 +195,13 @@ export default function NewTicketPage() {
     try {
       await apiFetch("/api/tickets", {
         method: "POST",
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          building_id: selectedBuildingId,
+          evidence_photos: photos,
+        }),
       });
-      toast.success("Tạo phiếu sửa chữa thành công");
+      toast.success("Tạo phiếu công việc thành công");
       router.push("/tickets");
     } catch (err: any) {
       toast.error("Lỗi: " + err.message);
@@ -166,7 +235,7 @@ export default function NewTicketPage() {
             </div>
 
             <div className="grid gap-2 relative">
-              <Label className="font-semibold text-foreground/90">Phòng <span className="text-destructive">*</span></Label>
+              <Label className="font-semibold text-foreground/90">Phòng (Tùy chọn)</Label>
               <div className="relative">
                 <SearchableSelect
                   options={rooms}
@@ -184,10 +253,10 @@ export default function NewTicketPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="title" className="font-semibold text-foreground/90">Tiêu đề sự cố <span className="text-destructive">*</span></Label>
+              <Label htmlFor="title" className="font-semibold text-foreground/90">Tiêu đề công việc <span className="text-destructive">*</span></Label>
               <Input
                 id="title"
-                placeholder="VD: Hỏng điều hòa, Rò rỉ nước..."
+                placeholder="VD: Hỏng điều hòa, Thay bóng đèn..."
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="h-11"
@@ -198,7 +267,7 @@ export default function NewTicketPage() {
               <Label htmlFor="description" className="font-semibold text-foreground/90">Mô tả chi tiết</Label>
               <Textarea
                 id="description"
-                placeholder="Nhập mô tả tình trạng sự cố (tùy chọn)"
+                placeholder="Nhập mô tả tình trạng công việc (tùy chọn)"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="min-h-[100px] resize-y"
@@ -206,12 +275,73 @@ export default function NewTicketPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="assigned_tech_id" className="font-semibold text-foreground/90">Kỹ thuật viên (Có thể gán sau)</Label>
+              <Label htmlFor="priority" className="font-semibold text-foreground/90">Mức độ ưu tiên <span className="text-destructive">*</span></Label>
+              <Select value={formData.priority} onValueChange={(val) => setFormData({ ...formData, priority: val || "MEDIUM" })}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Chọn mức độ ưu tiên" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">Thấp</SelectItem>
+                  <SelectItem value="MEDIUM">Trung bình</SelectItem>
+                  <SelectItem value="HIGH">Cao</SelectItem>
+                  <SelectItem value="URGENT">Khẩn cấp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {userRole === "TECHNICIAN" && (
+              <div className="grid gap-2">
+                <Label className="font-semibold text-foreground/90">Ảnh bằng chứng <span className="text-muted-foreground text-sm font-normal">(Tối đa 5 ảnh)</span></Label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  multiple 
+                  className="hidden" 
+                  ref={fileInputRef}
+                  onChange={handleUploadPhoto}
+                />
+                
+                {uploading && <p className="text-xs text-muted-foreground mb-2">Đang tải ảnh lên...</p>}
+                
+                {photos.length > 0 ? (
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                    {photos.map((url, idx) => (
+                      <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border group bg-muted">
+                        <img 
+                          src={url} 
+                          alt="Evidence" 
+                          className="w-full h-full object-cover" 
+                        />
+                        <button 
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); removePhoto(idx); }}
+                          className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full shadow-sm hover:bg-black/80 transition-colors z-10"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div 
+                    className="border-2 border-dashed border-muted-foreground/20 rounded-xl p-6 flex flex-col items-center justify-center text-muted-foreground bg-muted/5 cursor-pointer hover:bg-muted/20 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Camera className="w-6 h-6 mb-2 opacity-50" />
+                    <span className="text-xs">Chưa có ảnh nào</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <Label htmlFor="assigned_tech_id" className="font-semibold text-foreground/90">Người phụ trách (Tùy chọn)</Label>
               <SearchableSelect
                 options={techs}
                 value={formData.assigned_tech_id}
-                onValueChange={(val) => setFormData({ ...formData, assigned_tech_id: val })}
-                placeholder="Chọn kỹ thuật viên (nếu có)..."
+                onValueChange={(val) => setFormData({ ...formData, assigned_tech_id: val || "" })}
+                placeholder="Chọn người phụ trách"
+                searchPlaceholder="Tìm kiếm người phụ trách..."
               />
             </div>
           </form>
@@ -223,7 +353,7 @@ export default function NewTicketPage() {
         <Button 
           type="submit" 
           form="new-ticket-form"
-          disabled={submitting || !selectedBuildingId || !formData.room_id || !formData.title} 
+          disabled={submitting || !selectedBuildingId || !formData.title} 
           className="w-full shadow-md rounded-xl h-12 text-base font-semibold bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end hover:opacity-90 transition-opacity"
         >
           {submitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}

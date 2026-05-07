@@ -252,19 +252,14 @@ export default function MeterReadingsPage() {
         <div className="space-y-2">
           <label className="text-sm font-medium text-muted-foreground">Tòa nhà</label>
           <SearchableSelect
-            options={buildings.map((b) => ({
-              value: b.id,
-              label: `${b.name}${
-                [b.address, b.ward, b.district, b.province]
-                  .filter(Boolean)
-                  .join(", ")
-                  ? ` - ${[b.address, b.ward, b.district, b.province]
-                      .filter(Boolean)
-                      .join(", ")}`
-                  : ""
-              }`,
-              displayLabel: b.name,
-            }))}
+            options={buildings.map((b) => {
+              const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+              return {
+                value: b.id,
+                label: fullAddress,
+                displayLabel: fullAddress,
+              };
+            })}
             value={selectedBuildingId}
             onValueChange={setSelectedBuildingId}
             placeholder="Chọn nhà..."

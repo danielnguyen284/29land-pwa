@@ -9,8 +9,16 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 import { Room } from "./Room";
+import { Building } from "./Building";
 import { User } from "./User";
 import { TicketExpense } from "./TicketExpense";
+
+export enum TicketPriority {
+  LOW = "LOW",
+  MEDIUM = "MEDIUM",
+  HIGH = "HIGH",
+  URGENT = "URGENT",
+}
 
 export enum TicketStatus {
   PENDING = "PENDING",
@@ -26,12 +34,19 @@ export class Ticket {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ nullable: true })
   room_id!: string;
 
-  @ManyToOne(() => Room)
+  @ManyToOne(() => Room, { nullable: true })
   @JoinColumn({ name: "room_id" })
   room!: Room;
+
+  @Column({ nullable: true }) // Temporarily nullable for migration, then we enforce in API
+  building_id!: string;
+
+  @ManyToOne(() => Building)
+  @JoinColumn({ name: "building_id" })
+  building!: Building;
 
   @Column()
   created_by!: string;
@@ -52,6 +67,12 @@ export class Ticket {
 
   @Column({ type: "text", nullable: true })
   description!: string;
+
+  @Column({ type: "enum", enum: TicketPriority, default: TicketPriority.MEDIUM })
+  priority!: TicketPriority;
+
+  @Column({ type: "jsonb", default: [] })
+  evidence_photos!: string[];
 
   @Column({ type: "enum", enum: TicketStatus, default: TicketStatus.PENDING })
   status!: TicketStatus;

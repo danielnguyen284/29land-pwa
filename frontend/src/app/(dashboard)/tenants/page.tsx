@@ -255,19 +255,14 @@ export default function TenantsPage() {
           <SearchableSelect
             options={[
               { value: "ALL", label: "Tất cả nhà" },
-              ...buildings.map((b) => ({
-                value: b.id,
-                label: `${b.name}${
-                  [b.address, b.ward, b.district, b.province]
-                    .filter(Boolean)
-                    .join(", ")
-                    ? ` - ${[b.address, b.ward, b.district, b.province]
-                        .filter(Boolean)
-                        .join(", ")}`
-                    : ""
-                }`,
-                displayLabel: b.name,
-              })),
+              ...buildings.map((b) => {
+                const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+                return {
+                  value: b.id,
+                  label: fullAddress,
+                  displayLabel: fullAddress,
+                };
+              }),
             ]}
             value={filterBuilding}
             onValueChange={(v) => setFilterBuilding(v || "ALL")}
@@ -387,19 +382,14 @@ export default function TenantsPage() {
                 <div className="space-y-2">
                   <Label>Nhà <span className="text-destructive">*</span></Label>
                   <SearchableSelect
-                    options={buildings.map((b) => ({
-                      value: b.id,
-                      label: `${b.name}${
-                        [b.address, b.ward, b.district, b.province]
-                          .filter(Boolean)
-                          .join(", ")
-                          ? ` - ${[b.address, b.ward, b.district, b.province]
-                              .filter(Boolean)
-                              .join(", ")}`
-                          : ""
-                      }`,
-                      displayLabel: b.name,
-                    }))}
+                    options={buildings.map((b) => {
+                      const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+                      return {
+                        value: b.id,
+                        label: fullAddress,
+                        displayLabel: fullAddress,
+                      };
+                    })}
                     value={formBuildingId}
                     onValueChange={(v) => {
                       setFormBuildingId(v);

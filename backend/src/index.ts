@@ -83,6 +83,30 @@ AppDataSource.initialize()
         }
         console.log("Migration complete.");
       }
+    // Data Migration for Tickets (Fill building_id from room_id)
+    try {
+      const { Ticket } = await import("./entities/Ticket");
+      const { Room } = await import("./entities/Room");
+      const ticketRepo = AppDataSource.getRepository(Ticket);
+      
+      const ticketsWithoutBuilding = await ticketRepo.find({ 
+        where: { building_id: IsNull() },
+        relations: ["room", "room.floor"] 
+      });
+
+      if (ticketsWithoutBuilding.length > 0) {
+        console.log(`Found ${ticketsWithoutBuilding.length} tickets without building_id. Migrating...`);
+        for (const ticket of ticketsWithoutBuilding) {
+          if (ticket.room && ticket.room.floor && ticket.room.floor.building_id) {
+            await ticketRepo.update(ticket.id, { building_id: ticket.room.floor.building_id });
+          }
+        }
+        console.log("Ticket migration complete.");
+      }
+    } catch (e) {
+      console.error("Ticket migration error:", e);
+    }
+    
     } catch (e) {
       console.error("Migration error:", e);
     }

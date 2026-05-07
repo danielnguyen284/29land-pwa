@@ -9,6 +9,7 @@ import {
 } from "typeorm";
 import { Room } from "./Room";
 import { Tenant } from "./Tenant";
+import { OneToMany } from "typeorm";
 
 export enum ContractStatus {
   NEW = "NEW",
@@ -36,6 +37,9 @@ export class Contract {
   @ManyToOne(() => Tenant)
   @JoinColumn({ name: "representative_tenant_id" })
   representative_tenant!: Tenant;
+
+  @OneToMany(() => Tenant, tenant => tenant.contract)
+  tenants!: Tenant[];
 
   @Column({ type: "date" })
   start_date!: string;

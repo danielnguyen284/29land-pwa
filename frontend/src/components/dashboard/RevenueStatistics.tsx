@@ -147,15 +147,7 @@ export function RevenueStatistics() {
                 { value: "Tất cả", label: "Tất cả nhà" },
                 ...buildings.map((b) => ({
                   value: b.id,
-                  label: `${b.name}${
-                    [b.address, b.ward, b.district, b.province]
-                      .filter(Boolean)
-                      .join(", ")
-                      ? ` - ${[b.address, b.ward, b.district, b.province]
-                          .filter(Boolean)
-                          .join(", ")}`
-                      : ""
-                  }`,
+                  label: b.address ? `${b.name} - ${b.address}` : b.name,
                   displayLabel: b.name,
                 })),
               ]}

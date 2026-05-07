@@ -125,6 +125,19 @@ router.post("/:roomId/contracts", requireRole(UserRole.ADMIN, UserRole.OWNER, Us
       return;
     }
 
+    // Check for existing active/new contracts for this room
+    const existingContract = await contractRepo().findOne({
+      where: [
+        { room_id, status: ContractStatus.ACTIVE },
+        { room_id, status: ContractStatus.NEW }
+      ]
+    });
+
+    if (existingContract) {
+      res.status(400).json({ message: "Phòng này hiện đang có hợp đồng hoạt động. Vui lòng thanh lý hoặc hủy hợp đồng cũ trước khi tạo hợp đồng mới." });
+      return;
+    }
+
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0);
     const startDateObj = new Date(start_date);
@@ -154,7 +167,11 @@ router.post("/:roomId/contracts", requireRole(UserRole.ADMIN, UserRole.OWNER, Us
     if (idsToAssign.length > 0) {
       await AppDataSource.createQueryBuilder()
         .update(Tenant)
-        .set({ contract_id: saved.id })
+        .set({ 
+          contract_id: saved.id,
+          room_id: room_id,
+          status: "ACTIVE"
+        })
         .where("id IN (:...ids)", { ids: idsToAssign })
         .execute();
     }
@@ -176,7 +193,7 @@ router.patch("/:roomId/contracts/:contractId", requireRole(UserRole.ADMIN, UserR
     const contract = await contractRepo().findOneBy({ id: req.params.contractId as string });
     if (!contract) { res.status(404).json({ message: "Không tìm thấy hợp đồng" }); return; }
 
-    const { status, end_date, rent_amount, deposit_amount, document_photos } = req.body;
+    const { status, end_date, rent_amount, deposit_amount, document_photos, tenant_ids } = req.body;
     if (status !== undefined) contract.status = status;
     if (end_date !== undefined) contract.end_date = end_date;
     if (rent_amount !== undefined) contract.rent_amount = rent_amount;
@@ -184,6 +201,33 @@ router.patch("/:roomId/contracts/:contractId", requireRole(UserRole.ADMIN, UserR
     if (document_photos !== undefined) contract.document_photos = document_photos;
 
     await contractRepo().save(contract);
+
+    // Update tenants if tenant_ids provided
+    if (tenant_ids !== undefined && Array.isArray(tenant_ids)) {
+      const newIds = [...tenant_ids];
+      if (!newIds.includes(contract.representative_tenant_id)) {
+        newIds.push(contract.representative_tenant_id);
+      }
+
+      // 1. Mark tenants who were in this contract but not in the new list as INACTIVE
+      await AppDataSource.createQueryBuilder()
+        .update(Tenant)
+        .set({ status: "INACTIVE", contract_id: null as any })
+        .where("contract_id = :contractId", { contractId: contract.id })
+        .andWhere("id NOT IN (:...newIds)", { newIds })
+        .execute();
+
+      // 2. Mark new tenants as ACTIVE and link to this contract/room
+      await AppDataSource.createQueryBuilder()
+        .update(Tenant)
+        .set({ 
+          status: "ACTIVE", 
+          contract_id: contract.id,
+          room_id: contract.room_id
+        })
+        .where("id IN (:...newIds)", { newIds })
+        .execute();
+    }
 
     // If terminated, set room to EMPTY
     if (status === ContractStatus.TERMINATED || status === ContractStatus.EXPIRED) {
@@ -271,7 +315,7 @@ router.post("/:roomId/contracts/:contractId/reactivate", requireRole(UserRole.AD
 
     const room = await roomRepo().findOneBy({ id: contract.room_id });
     if (room && room.status === RoomStatus.OCCUPIED) {
-      res.status(400).json({ message: "Phòng đang có người ở (hợp đồng khác đang hiệu lực). Không thể kích hoạt." });
+      res.status(400).json({ message: "Phòng đang thuê (hợp đồng khác đang hiệu lực). Không thể kích hoạt." });
       return;
     }
 

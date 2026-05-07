@@ -148,7 +148,7 @@ export default function DashboardPage() {
     { id: "close_numbers", label: "Chốt số", icon: FileEdit, href: "/meter-readings", roles: ["ADMIN", "MANAGER"] },
     // { id: "approvals", label: "Phê duyệt", icon: ClipboardCheck, href: "/approvals", roles: ["ADMIN", "OWNER"] },
     // { id: "finance", label: "Thu chi", icon: Banknote, href: "/finance", roles: ["ADMIN", "MANAGER", "OWNER"] },
-    { id: "incidents", label: "Sự cố", icon: Siren, href: "/tickets", roles: ["ADMIN", "MANAGER", "TECHNICIAN", "OWNER"] },
+    { id: "incidents", label: "Công việc", icon: Siren, href: "/tickets", roles: ["ADMIN", "MANAGER", "TECHNICIAN", "OWNER"] },
     // { id: "feedback", label: "Góp ý", icon: Mail, href: "/feedback", roles: ["ADMIN", "MANAGER"] },
     // { id: "listings", label: "Tin đăng", icon: Store, href: "/listings", roles: ["ADMIN", "MANAGER"] },
     { id: "invoices", label: "Hoá đơn", icon: Receipt, href: "/billing", roles: ["ADMIN", "MANAGER", "OWNER"] },

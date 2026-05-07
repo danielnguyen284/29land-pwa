@@ -17,13 +17,20 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { apiFetch } from "@/lib/api";
 import { Ticket, TicketExpense, User } from "@/lib/types";
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string, color: string }> = {
   PENDING: { label: "Chờ xử lý", color: "bg-amber-100 text-amber-800" },
   IN_PROGRESS: { label: "Đang xử lý", color: "bg-blue-100 text-blue-800" },
   WAITING_APPROVAL: { label: "Chờ duyệt", color: "bg-purple-100 text-purple-800" },
   NEEDS_EXPLANATION: { label: "Cần giải trình", color: "bg-rose-100 text-rose-800" },
   COMPLETED: { label: "Hoàn thành", color: "bg-emerald-100 text-emerald-800" },
   OVERDUE: { label: "Quá hạn", color: "bg-red-100 text-red-800" },
+};
+
+const priorityConfig: Record<string, { label: string, color: string }> = {
+  LOW: { label: "Ưu tiên: Thấp", color: "bg-slate-100 text-slate-800" },
+  MEDIUM: { label: "Ưu tiên: Trung bình", color: "bg-blue-100 text-blue-800" },
+  HIGH: { label: "Ưu tiên: Cao", color: "bg-orange-100 text-orange-800" },
+  URGENT: { label: "Khẩn cấp", color: "bg-rose-100 text-rose-800 border-rose-200" },
 };
 
 const expenseStatusConfig = {
@@ -52,7 +59,9 @@ export default function TicketDetailsPage() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [submittingExpense, setSubmittingExpense] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   const expenseFileInputRef = useRef<HTMLInputElement>(null);
+  const evidenceFileInputRef = useRef<HTMLInputElement>(null);
 
   const removePhoto = (index: number) => {
     const newPhotos = [...photos];
@@ -84,8 +93,21 @@ export default function TicketDetailsPage() {
 
       const localUserStr = localStorage.getItem("user");
       if (localUserStr && ["ADMIN", "MANAGER", "OWNER"].includes(JSON.parse(localUserStr).role)) {
+        const buildingId = t.building_id;
+        let buildingManagers: User[] = [];
+        if (buildingId) {
+          try {
+            buildingManagers = await apiFetch<User[]>(`/api/buildings/${buildingId}/managers`);
+          } catch (e) {
+            console.warn("Failed to fetch building managers", e);
+          }
+        }
         const usersData = await apiFetch<User[]>("/api/users");
-        setTechs(usersData.filter(u => u.role === "TECHNICIAN").map(u => ({ value: u.id, label: u.name })));
+        
+        setTechs([
+          ...buildingManagers.map((m) => ({ value: m.id, label: `${m.name} (Quản lý)` })),
+          ...usersData.filter(u => u.role === "TECHNICIAN").map(u => ({ value: u.id, label: `${u.name} (Kỹ thuật)` }))
+        ]);
       }
     } catch (err: any) {
       toast.error(err.message || "Lỗi tải phiếu");
@@ -94,9 +116,47 @@ export default function TicketDetailsPage() {
     }
   };
 
+  const handleUploadEvidence = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploadingEvidence(true);
+    try {
+      const currentPhotos = [...(ticket?.evidence_photos || [])];
+      for (let i = 0; i < files.length; i++) {
+        if (currentPhotos.length >= 10) break;
+        const file = files[i];
+        const reader = new FileReader();
+        const base64 = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+
+        const res = await apiFetch<{url: string}>("/api/upload", {
+          method: "POST",
+          body: JSON.stringify({ image: base64 })
+        });
+        currentPhotos.push(res.url);
+      }
+      
+      await apiFetch(`/api/tickets/${ticket?.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ evidence_photos: currentPhotos })
+      });
+      
+      fetchData();
+      toast.success("Đã cập nhật ảnh bằng chứng");
+    } catch (err: any) {
+      toast.error("Lỗi: " + err.message);
+    } finally {
+      setIsUploadingEvidence(false);
+      if (evidenceFileInputRef.current) evidenceFileInputRef.current.value = "";
+    }
+  };
+
   const handleAssign = async () => {
     if (!assignTechId) {
-      toast.error("Vui lòng chọn kỹ thuật viên");
+      toast.error("Vui lòng chọn người phụ trách");
       return;
     }
     setAssigning(true);
@@ -105,7 +165,7 @@ export default function TicketDetailsPage() {
         method: "PATCH",
         body: JSON.stringify({ assigned_tech_id: assignTechId })
       });
-      toast.success("Đã phân công kỹ thuật viên");
+      toast.success("Đã phân công người phụ trách");
       setIsAssignDialogOpen(false);
       fetchData();
     } catch (err: any) {
@@ -245,6 +305,7 @@ export default function TicketDetailsPage() {
   if (!ticket) return <div className="text-center py-20 text-muted-foreground">Không tìm thấy phiếu</div>;
 
   const status = statusConfig[ticket.status] || { label: ticket.status, color: "bg-gray-100 text-gray-700" };
+  const priority = priorityConfig[ticket.priority] || priorityConfig["MEDIUM"];
   const hasUnsettledExpenses = ticket.expenses?.some(exp => exp.status !== "APPROVED");
 
   return (
@@ -257,56 +318,133 @@ export default function TicketDetailsPage() {
             <p className="text-muted-foreground text-sm">Tạo lúc: {format(new Date(ticket.created_at), "dd/MM/yyyy HH:mm", { locale: vi })}</p>
           </div>
         </div>
-        <Badge variant="outline" className={`${status.color} border-none font-medium px-3 py-1`}>
-          {status.label}
-        </Badge>
+        <div className="flex gap-2">
+          <Badge variant="outline" className={`${priority.color} border-none font-medium px-3 py-1`}>
+            {priority.label}
+          </Badge>
+          <Badge variant="outline" className={`${status.color} border-none font-medium px-3 py-1`}>
+            {status.label}
+          </Badge>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
-        <div className="md:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader><CardTitle>Thông tin chi tiết</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-muted-foreground block mb-1">Phòng</span>
-                  <span className="font-semibold">{ticket.room?.name || "N/A"}</span>
+                  <span className="text-muted-foreground block mb-1">Tòa nhà / Phòng</span>
+                  <span className="font-semibold">{ticket.building?.name || "N/A"} {ticket.room ? `- P.${ticket.room.name}` : ""}</span>
+                  {ticket.building && (
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      {[ticket.building.address, ticket.building.ward, ticket.building.district, ticket.building.province].filter(Boolean).join(", ")}
+                    </span>
+                  )}
                 </div>
                 <div>
-                  <span className="text-muted-foreground block mb-1">Kỹ thuật viên</span>
+                  <span className="text-muted-foreground block mb-1">Người phụ trách</span>
                   {ticket.assigned_tech ? (
-                    <span className="font-semibold">{ticket.assigned_tech.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{ticket.assigned_tech.name}</span>
+                      {["ADMIN", "MANAGER"].includes(userRole) && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-7 text-xs bg-muted"
+                          onClick={() => {
+                            setAssignTechId(ticket.assigned_tech_id || "");
+                            setIsAssignDialogOpen(true);
+                          }}
+                        >
+                          Đổi
+                        </Button>
+                      )}
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground italic">Chưa gán</span>
                       {["ADMIN", "MANAGER"].includes(userRole) && (
-                        <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-                          <DialogTrigger render={<Button size="sm" variant="outline" className="h-7 px-2 text-xs" />}>
-                            Gán ngay
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader><DialogTitle>Phân công kỹ thuật viên</DialogTitle></DialogHeader>
-                            <div className="py-4">
-                              <Label>Chọn kỹ thuật viên</Label>
-                              <SearchableSelect options={techs} value={assignTechId} onValueChange={setAssignTechId} placeholder="Chọn..." />
-                            </div>
-                            <DialogFooter>
-                              <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>Hủy</Button>
-                              <Button onClick={handleAssign} disabled={assigning}>
-                                {assigning && <Loader2 className="w-4 h-4 mr-2 animate-spin"/>} Lưu
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-7 px-2 text-xs"
+                          onClick={() => {
+                            setAssignTechId("");
+                            setIsAssignDialogOpen(true);
+                          }}
+                        >
+                          Gán ngay
+                        </Button>
                       )}
                     </div>
                   )}
                 </div>
               </div>
               <div>
-                <span className="text-muted-foreground block mb-1 text-sm">Mô tả sự cố</span>
+                <span className="text-muted-foreground block mb-1 text-sm">Mô tả công việc</span>
                 <p className="bg-muted/50 p-3 rounded-lg text-sm">{ticket.description || "Không có mô tả"}</p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-muted-foreground block text-sm">Ảnh hiện trạng / Bằng chứng</span>
+                  {userRole === "TECHNICIAN" && (
+                    <>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 text-xs text-primary"
+                        onClick={() => evidenceFileInputRef.current?.click()}
+                        disabled={isUploadingEvidence}
+                      >
+                        {isUploadingEvidence ? <Loader2 className="w-3 h-3 animate-spin mr-1"/> : <Upload className="w-3 h-3 mr-1"/>}
+                        Thêm ảnh
+                      </Button>
+                      <input 
+                        type="file" 
+                        ref={evidenceFileInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
+                        multiple 
+                        onChange={handleUploadEvidence} 
+                      />
+                    </>
+                  )}
+                </div>
+                
+                {ticket.evidence_photos && ticket.evidence_photos.length > 0 ? (
+                  <div className="flex flex-wrap gap-3">
+                    {ticket.evidence_photos.map((p, i) => (
+                      <div key={i} className="relative group">
+                        <a href={p} target="_blank" rel="noreferrer">
+                          <img src={p} alt="evidence" className="w-24 h-24 object-cover rounded-xl border hover:opacity-80 transition-opacity" />
+                        </a>
+                        {userRole === "TECHNICIAN" && (
+                          <button 
+                            className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              if (!confirm("Xóa ảnh này?")) return;
+                              const newPhotos = ticket.evidence_photos.filter((_, idx) => idx !== i);
+                              await apiFetch(`/api/tickets/${ticket.id}`, {
+                                method: "PATCH",
+                                body: JSON.stringify({ evidence_photos: newPhotos })
+                              });
+                              fetchData();
+                            }}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">Chưa có ảnh bằng chứng</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -326,6 +464,7 @@ export default function TicketDetailsPage() {
                   }}>
                     <Plus className="w-4 h-4 mr-1"/> Báo chi phí
                   </Button>
+
                   <Dialog open={isExpenseDialogOpen} onOpenChange={setIsExpenseDialogOpen}>
                     <DialogContent>
                       <DialogHeader><DialogTitle>{editingExpenseId ? "Chỉnh sửa chi phí" : "Báo cáo chi phí"}</DialogTitle></DialogHeader>
@@ -394,8 +533,25 @@ export default function TicketDetailsPage() {
                         {submittingExpense && <Loader2 className="w-4 h-4 mr-2 animate-spin"/>} Lưu
                       </Button>
                     </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Assignment Dialog */}
+                  <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+                    <DialogContent>
+                      <DialogHeader><DialogTitle>Phân công người phụ trách</DialogTitle></DialogHeader>
+                      <div className="py-4">
+                        <Label>Chọn người phụ trách</Label>
+                        <SearchableSelect options={techs} value={assignTechId} onValueChange={setAssignTechId} placeholder="Chọn..." />
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>Hủy</Button>
+                        <Button onClick={handleAssign} disabled={assigning}>
+                          {assigning && <Loader2 className="w-4 h-4 mr-2 animate-spin"/>} Lưu
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </>
               )}
             </CardHeader>
@@ -505,8 +661,8 @@ export default function TicketDetailsPage() {
                         {["TECHNICIAN", "MANAGER", "ADMIN"].includes(userRole) && exp.status === "REJECTED" && (
                           <div className="pt-2 border-t">
                              <Dialog open={isResubmitDialogOpen && activeExpenseId === exp.id} onOpenChange={(open) => { setIsResubmitDialogOpen(open); setActiveExpenseId(exp.id); }}>
-                              <DialogTrigger render={<Button size="sm" variant="outline" className="w-full text-blue-600 border-blue-200 hover:bg-blue-50" />}>
-                                <RefreshCw className="w-4 h-4 mr-1"/> Giải trình & Nộp lại
+                              <DialogTrigger render={<Button size="sm" variant="outline" className="w-full text-blue-600 border-blue-200 hover:bg-blue-50 whitespace-normal h-auto py-1.5" />}>
+                                <RefreshCw className="w-4 h-4 mr-1 shrink-0"/> <span>Giải trình & Nộp lại</span>
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader><DialogTitle>Giải trình chi phí</DialogTitle></DialogHeader>
@@ -546,12 +702,12 @@ export default function TicketDetailsPage() {
               {ticket.status !== "COMPLETED" && ticket.status !== "WAITING_APPROVAL" && (userRole === "TECHNICIAN" || ["ADMIN", "MANAGER", "OWNER"].includes(userRole)) && (
                 <div className="space-y-2">
                   <Button 
-                    className="w-full" 
+                    className="w-full whitespace-normal h-auto py-2" 
                     variant="outline" 
                     onClick={handleSubmitApprovalOrComplete}
                   >
-                    <CheckCircle className="w-4 h-4 mr-2"/> 
-                    {ticket.expenses && ticket.expenses.length > 0 ? "Gửi chờ duyệt" : "Đánh dấu hoàn thành"}
+                    <CheckCircle className="w-4 h-4 mr-2 shrink-0"/> 
+                    <span>{ticket.expenses && ticket.expenses.length > 0 ? "Gửi chờ duyệt" : "Đánh dấu hoàn thành"}</span>
                   </Button>
                 </div>
               )}

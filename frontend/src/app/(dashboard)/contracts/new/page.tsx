@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { format, addMonths, addYears, subDays, endOfMonth } from "date-fns";
 import { Suspense } from "react";
 import { 
   ArrowLeft, 
@@ -11,6 +12,7 @@ import {
   X,
   Download
 } from "lucide-react";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { apiFetch } from "@/lib/api";
+import { AccompanyingTenantsSection, AccompanyingTenant } from "@/components/AccompanyingTenantsSection";
 
 interface Building {
   id: string;
@@ -67,10 +70,21 @@ function NewContractForm() {
   const [formRoomId, setFormRoomId] = useState<string>(initialRoomId);
   const [formTenantMode, setFormTenantMode] = useState<"existing" | "new">("existing");
   const [formTenantId, setFormTenantId] = useState<string>("");
-  const [formAccompanyingTenantIds, setFormAccompanyingTenantIds] = useState<string[]>([]);
+  const [formAccompanyingTenants, setFormAccompanyingTenants] = useState<AccompanyingTenant[]>([]);
   const [formNewTenant, setFormNewTenant] = useState({ name: "", phone: "", cccd: "" });
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
+
+  const setDuration = (months: number) => {
+    if (!formStartDate) {
+      toast.error("Vui lòng chọn ngày bắt đầu trước");
+      return;
+    }
+    const start = new Date(formStartDate);
+    const targetDate = addMonths(start, months);
+    const finalEnd = endOfMonth(subDays(targetDate, 1));
+    setFormEndDate(format(finalEnd, "yyyy-MM-dd"));
+  };
   const [formRent, setFormRent] = useState("");
   const [formDeposit, setFormDeposit] = useState("");
   const [formPhotos, setFormPhotos] = useState<string[]>([]);
@@ -116,16 +130,21 @@ function NewContractForm() {
 
   useEffect(() => {
     if (formRoomId) {
-      fetchTenants(formRoomId, setFormTenants);
       const selectedRoom = formRooms.find(r => r.id === formRoomId);
       if (selectedRoom) {
+        if (selectedRoom.status === 'OCCUPIED') {
+          toast.error("Phòng này hiện đang có hợp đồng hoạt động. Vui lòng chọn phòng khác.");
+          setFormRoomId("");
+          return;
+        }
+        fetchTenants(formRoomId, setFormTenants);
         setFormRent(selectedRoom.base_rent.toString());
         setFormDeposit(selectedRoom.base_rent.toString());
       }
     } else {
       setFormTenants([]);
       setFormTenantId("");
-      setFormAccompanyingTenantIds([]);
+      setFormAccompanyingTenants([]);
       setFormRent("");
       setFormDeposit("");
     }
@@ -220,6 +239,22 @@ function NewContractForm() {
         finalTenantId = tenantRes.id;
       }
 
+      // Handle accompanying tenants
+      const finalAccompanyingIds: string[] = [];
+      for (const at of formAccompanyingTenants) {
+        if (at.mode === "new") {
+          // Create new accompanying tenant
+          const res = await apiFetch<{id: string}>(`/api/rooms/${formRoomId}/tenants`, {
+            method: "POST",
+            body: JSON.stringify({ name: at.name, phone: at.phone, cccd: at.cccd, is_representative: false })
+          });
+          finalAccompanyingIds.push(res.id);
+        } else if (at.id) {
+          // Use existing ID
+          finalAccompanyingIds.push(at.id);
+        }
+      }
+
       const payload = {
         representative_tenant_id: finalTenantId,
         start_date: formStartDate,
@@ -227,7 +262,7 @@ function NewContractForm() {
         rent_amount: Number(formRent),
         deposit_amount: Number(formDeposit),
         document_photos: formPhotos,
-        tenant_ids: [finalTenantId, ...formAccompanyingTenantIds],
+        tenant_ids: [finalTenantId, ...finalAccompanyingIds],
         status: "ACTIVE" // Default status for new contract
       };
 
@@ -255,18 +290,14 @@ function NewContractForm() {
               <div className="space-y-2">
                 <Label>Nhà <span className="text-destructive">*</span></Label>
                 <SearchableSelect
-                  options={buildings.map((b) => ({
-                    value: b.id,
-                    label: `${b.name}${
-                      [b.address, b.ward, b.district, b.province]
-                        .filter(Boolean)
-                        .join(", ")
-                        ? ` - ${[b.address, b.ward, b.district, b.province]
-                            .filter(Boolean)
-                            .join(", ")}`
-                        : ""
-                    }`,
-                  }))}
+                  options={buildings.map((b) => {
+                    const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+                    return {
+                      value: b.id,
+                      label: fullAddress,
+                      displayLabel: fullAddress,
+                    };
+                  })}
                   value={formBuildingId}
                   onValueChange={(v) => setFormBuildingId(v)}
                   placeholder="Chọn nhà"
@@ -277,7 +308,11 @@ function NewContractForm() {
               <div className="space-y-2">
                 <Label>Phòng <span className="text-destructive">*</span></Label>
                 <SearchableSelect
-                  options={formRooms.map((r) => ({ value: r.id, label: r.name }))}
+                  options={formRooms.map((r) => ({ 
+                    value: r.id, 
+                    label: `${r.name}${r.status === 'OCCUPIED' ? ' (Đang thuê)' : ''}`,
+                    disabled: r.status === 'OCCUPIED'
+                  }))}
                   value={formRoomId}
                   onValueChange={(v) => setFormRoomId(v)}
                   placeholder="Chọn phòng"
@@ -346,34 +381,14 @@ function NewContractForm() {
               </div>
             )}
 
-            {/* Accompanying Tenants Selection */}
-            {formTenants.filter(t => t.id !== (formTenantMode === "existing" ? formTenantId : "")).length > 0 && (
-              <div className="pt-4 border-t mt-4">
-                <Label className="text-base font-semibold block mb-3">Khách thuê đi kèm (từ danh sách phòng)</Label>
-                <div className="space-y-3">
-                  {formTenants
-                    .filter(t => t.id !== (formTenantMode === "existing" ? formTenantId : ""))
-                    .map(t => (
-                      <label key={t.id} className="flex items-center space-x-3 cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                          checked={formAccompanyingTenantIds.includes(t.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormAccompanyingTenantIds(prev => [...prev, t.id]);
-                            } else {
-                              setFormAccompanyingTenantIds(prev => prev.filter(id => id !== t.id));
-                            }
-                          }}
-                        />
-                        <span className="text-sm font-medium">{t.name}</span>
-                        {t.phone && <span className="text-xs text-muted-foreground">- {t.phone}</span>}
-                      </label>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="pt-4 border-t mt-4">
+              <AccompanyingTenantsSection 
+                buildingId={formBuildingId}
+                tenants={formAccompanyingTenants}
+                onChange={setFormAccompanyingTenants}
+                excludeIds={[formTenantId].filter(Boolean)}
+              />
+            </div>
           </div>
 
           <div className="bg-card border rounded-2xl p-5 shadow-sm space-y-5">
@@ -384,7 +399,14 @@ function NewContractForm() {
                 <Input type="date" value={formStartDate} onChange={e => setFormStartDate(e.target.value)} required />
               </div>
               <div className="space-y-2">
-                <Label>Ngày kết thúc <span className="text-destructive">*</span></Label>
+                <div className="flex justify-between items-center">
+                  <Label>Ngày kết thúc <span className="text-destructive">*</span></Label>
+                  <div className="flex gap-1">
+                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(3)}>3T</Button>
+                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(6)}>6T</Button>
+                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(12)}>12T</Button>
+                  </div>
+                </div>
                 <Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} required />
               </div>
               <div className="space-y-2">

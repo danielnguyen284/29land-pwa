@@ -18,21 +18,41 @@ router.get("/", async (req: AuthRequest, res: Response) => {
   try {
     const { floor_id, building_id, status } = req.query;
     const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 12;
+    const limit = parseInt(req.query.limit as string) || 1000; // Increased limit for internal use if needed
     const skip = (page - 1) * limit;
 
-    const where: any = {};
-    if (floor_id) where.floor_id = floor_id as string;
-    if (building_id) where.floor = { building_id: building_id as string };
-    if (status) where.status = status as string;
+    const qb = roomRepo().createQueryBuilder("room")
+      .leftJoinAndSelect("room.floor", "floor")
+      .leftJoinAndSelect("floor.building", "building")
+      .leftJoinAndSelect("room.room_class", "room_class");
 
-    const [rooms, total] = await roomRepo().findAndCount({
-      where,
-      relations: ["floor", "room_class"],
-      order: { name: "ASC" },
-      skip,
-      take: limit
-    });
+    const { role, id } = req.user!;
+
+    if (role === UserRole.OWNER) {
+      qb.andWhere("building.owner_id = :ownerId", { ownerId: id });
+    } else if (role === UserRole.MANAGER) {
+      const managerRepo = AppDataSource.getRepository("BuildingManager");
+      const assignments = await managerRepo.find({ where: { manager_id: id } });
+      const buildingIds = assignments.map((a: any) => a.building_id);
+      if (buildingIds.length === 0) {
+        res.json({ data: [], meta: { total: 0, page, limit, totalPages: 0 } });
+        return;
+      }
+      qb.andWhere("building.id IN (:...buildingIds)", { buildingIds });
+    }
+
+    if (floor_id) qb.andWhere("room.floor_id = :floorId", { floorId: floor_id });
+    if (building_id) qb.andWhere("floor.building_id = :buildingId", { buildingId: building_id });
+    if (status) qb.andWhere("room.status = :status", { status: status });
+
+    qb.orderBy("room.name", "ASC");
+    
+    // Only apply pagination if explicitly requested or for list views
+    if (req.query.page) {
+      qb.skip(skip).take(limit);
+    }
+
+    const [rooms, total] = await qb.getManyAndCount();
     
     res.json({
       data: rooms,
@@ -52,6 +72,28 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
       relations: ["floor", "room_class"],
     });
     if (!room) { res.status(404).json({ message: "Không tìm thấy phòng" }); return; }
+
+    if (req.user!.role === UserRole.OWNER) {
+      const buildingRepo = AppDataSource.getRepository(Building);
+      const building = await buildingRepo.findOneBy({ id: room.floor.building_id });
+      if (!building || building.owner_id !== req.user!.id) {
+        res.status(403).json({ message: "Không có quyền xem phòng này" });
+        return;
+      }
+    }
+
+    if (req.user!.role === UserRole.MANAGER) {
+      const managerRepo = AppDataSource.getRepository("BuildingManager");
+      const assignment = await managerRepo.findOneBy({ 
+        building_id: room.floor.building_id, 
+        manager_id: req.user!.id 
+      });
+      if (!assignment) {
+        res.status(403).json({ message: "Không có quyền xem phòng này" });
+        return;
+      }
+    }
+
     res.json(room);
   } catch (error) {
     console.error("Get room error:", error);

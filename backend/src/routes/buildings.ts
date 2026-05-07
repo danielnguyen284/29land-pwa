@@ -7,6 +7,7 @@ import { Floor } from "../entities/Floor";
 import { Room } from "../entities/Room";
 import { User, UserRole } from "../entities/User";
 import { authenticate, requireRole, AuthRequest } from "../middlewares/auth";
+import { requireBuildingAccess } from "../middlewares/accessControl";
 import { In, ILike } from "typeorm";
 
 const router = Router();
@@ -17,7 +18,7 @@ const floorRepo = () => AppDataSource.getRepository(Floor);
 
 router.use(authenticate);
 
-// Middleware to check if OWNER actually owns the building
+// Middleware to check if OWNER actually owns the building (For Write operations)
 const requireBuildingOwnership = async (req: AuthRequest, res: Response, next: NextFunction) => {
   if (req.user!.role === UserRole.ADMIN) return next();
   if (req.user!.role === UserRole.OWNER) {
@@ -199,7 +200,7 @@ router.post("/", requireRole(UserRole.ADMIN), async (req: AuthRequest, res: Resp
 });
 
 // GET /api/buildings/:id
-router.get("/:id", async (req: AuthRequest, res: Response) => {
+router.get("/:id", requireBuildingAccess, async (req: AuthRequest, res: Response) => {
   try {
     const building = await buildingRepo().findOne({
       where: { id: req.params.id as string },
@@ -220,6 +221,24 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
     res.json({ ...building, managers });
   } catch (error) {
     console.error("Get building error:", error);
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+});
+
+// GET /api/buildings/:id/managers
+router.get("/:id/managers", requireBuildingAccess, async (req: AuthRequest, res: Response) => {
+  try {
+    const assignments = await managerRepo().find({ where: { building_id: req.params.id as string } });
+    if (assignments.length === 0) {
+      res.json([]);
+      return;
+    }
+    const managerIds = assignments.map(a => a.manager_id);
+    const userRepo = AppDataSource.getRepository(User);
+    const managerUsers = await userRepo.find({ where: { id: In(managerIds) } });
+    res.json(managerUsers);
+  } catch (error) {
+    console.error("Get building managers error:", error);
     res.status(500).json({ message: "Lỗi hệ thống" });
   }
 });
@@ -285,7 +304,7 @@ router.delete("/:id", requireRole(UserRole.ADMIN, UserRole.OWNER), requireBuildi
 // ─── Manager Assignment ───
 
 // GET /api/buildings/:id/managers
-router.get("/:id/managers", async (req: AuthRequest, res: Response) => {
+router.get("/:id/managers", requireBuildingAccess, async (req: AuthRequest, res: Response) => {
   try {
     const assignments = await managerRepo().find({
       where: { building_id: req.params.id as string },
@@ -345,7 +364,7 @@ router.delete("/:id/managers/:managerId", requireRole(UserRole.ADMIN, UserRole.O
 // ─── Floors ───
 
 // GET /api/buildings/:id/floors
-router.get("/:id/floors", async (req: AuthRequest, res: Response) => {
+router.get("/:id/floors", requireBuildingAccess, async (req: AuthRequest, res: Response) => {
   try {
     const floors = await floorRepo().find({
       where: { building_id: req.params.id as string },
@@ -406,7 +425,7 @@ router.delete("/:id/floors/:floorId", requireRole(UserRole.ADMIN, UserRole.OWNER
 // ─── Room Classes ───
 
 // GET /api/buildings/:id/room-classes
-router.get("/:id/room-classes", async (req: AuthRequest, res: Response) => {
+router.get("/:id/room-classes", requireBuildingAccess, async (req: AuthRequest, res: Response) => {
   try {
     const classes = await classRepo().find({
       where: { building_id: req.params.id as string },

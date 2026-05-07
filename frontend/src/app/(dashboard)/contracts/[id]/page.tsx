@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, use } from "react";
 import { useRouter } from "next/navigation";
+import { format, addMonths, subDays, endOfMonth } from "date-fns";
 import { 
   ArrowLeft, 
   Loader2,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { apiFetch } from "@/lib/api";
+import { AccompanyingTenantsSection, AccompanyingTenant } from "@/components/AccompanyingTenantsSection";
 
 interface Tenant {
   id: string;
@@ -41,6 +43,7 @@ interface Contract {
   deposit_amount: number;
   status: "NEW" | "ACTIVE" | "EXPIRED" | "TERMINATED" | "CANCELLED";
   document_photos: string[];
+  tenants: Tenant[];
   room: {
     id: string;
     name: string;
@@ -69,6 +72,7 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
   const [formRent, setFormRent] = useState("");
   const [formDeposit, setFormDeposit] = useState("");
   const [formPhotos, setFormPhotos] = useState<string[]>([]);
+  const [formAccompanyingTenants, setFormAccompanyingTenants] = useState<AccompanyingTenant[]>([]);
   const [formStatus, setFormStatus] = useState<string>("ACTIVE");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -108,6 +112,17 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  const setDuration = (months: number) => {
+    if (!formStartDate) {
+      alert("Vui lòng chọn ngày bắt đầu trước");
+      return;
+    }
+    const start = new Date(formStartDate);
+    const targetDate = addMonths(start, months);
+    const finalEnd = endOfMonth(subDays(targetDate, 1));
+    setFormEndDate(format(finalEnd, "yyyy-MM-dd"));
+  };
+
   useEffect(() => {
     fetchContractDetails();
   }, [id]);
@@ -115,12 +130,8 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
-      // Currently the backend has GET /api/contracts which returns a list. 
-      // It might not have a GET /api/contracts/:id or GET /api/rooms/:roomId/contracts/:id yet.
-      // But we can fetch all contracts and filter, or we can fetch room contracts if we know the room.
-      // Easiest is to fetch all contracts and find it since there's no direct single contract endpoint requested.
-      const data = await apiFetch<Contract[]>("/api/contracts");
-      const currentContract = data.find(c => c.id === id);
+      // Use the new single contract endpoint
+      const currentContract = await apiFetch<Contract>(`/api/contracts/${id}`);
       
       if (currentContract) {
         setContract(currentContract);
@@ -131,6 +142,18 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
         setFormDeposit(currentContract.deposit_amount.toString());
         setFormPhotos(currentContract.document_photos || []);
         setFormStatus(currentContract.status);
+
+        // Initialize accompanying tenants (exclude representative)
+        const others = (currentContract.tenants || [])
+          .filter(t => t.id !== currentContract.representative_tenant_id)
+          .map(t => ({
+            id: t.id,
+            mode: "existing" as const,
+            name: t.name,
+            phone: t.phone || "",
+            cccd: t.cccd || ""
+          }));
+        setFormAccompanyingTenants(others);
 
         // Fetch tenants for this room
         fetchTenants(currentContract.room_id);
@@ -274,6 +297,22 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
 
     setFormLoading(true);
     try {
+      // 1. Handle accompanying tenants
+      const finalAccompanyingIds: string[] = [];
+      for (const at of formAccompanyingTenants) {
+        if (at.mode === "new") {
+          // Create new accompanying tenant
+          const res = await apiFetch<{id: string}>(`/api/rooms/${contract.room_id}/tenants`, {
+            method: "POST",
+            body: JSON.stringify({ name: at.name, phone: at.phone, cccd: at.cccd, is_representative: false })
+          });
+          finalAccompanyingIds.push(res.id);
+        } else if (at.id) {
+          // Use existing ID
+          finalAccompanyingIds.push(at.id);
+        }
+      }
+
       const payload = {
         representative_tenant_id: formTenantId,
         start_date: formStartDate,
@@ -281,6 +320,7 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
         rent_amount: Number(formRent),
         deposit_amount: Number(formDeposit),
         document_photos: formPhotos,
+        tenant_ids: [formTenantId, ...finalAccompanyingIds],
         status: formStatus
       };
 
@@ -342,6 +382,15 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
                 searchPlaceholder="Tìm kiếm khách thuê..."
                 emptyMessage="Không tìm thấy khách thuê."
               />
+
+              <div className="pt-4 border-t mt-4">
+                <AccompanyingTenantsSection 
+                  buildingId={contract.room?.building_id || ""}
+                  tenants={formAccompanyingTenants}
+                  onChange={setFormAccompanyingTenants}
+                  excludeIds={[formTenantId].filter(Boolean)}
+                />
+              </div>
             </div>
           </div>
 
@@ -376,7 +425,14 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
                 <Input type="date" value={formStartDate} onChange={e => setFormStartDate(e.target.value)} required />
               </div>
               <div className="space-y-2">
-                <Label>Ngày kết thúc <span className="text-destructive">*</span></Label>
+                <div className="flex justify-between items-center">
+                  <Label>Ngày kết thúc <span className="text-destructive">*</span></Label>
+                  <div className="flex gap-1">
+                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(3)}>3T</Button>
+                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(6)}>6T</Button>
+                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(12)}>12T</Button>
+                  </div>
+                </div>
                 <Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} required />
               </div>
               <div className="space-y-2">

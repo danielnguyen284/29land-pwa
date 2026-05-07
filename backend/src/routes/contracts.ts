@@ -56,6 +56,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     const qb = contractRepo().createQueryBuilder("c")
       .leftJoinAndSelect("c.room", "r")
       .leftJoinAndSelect("c.representative_tenant", "t")
+      .leftJoinAndSelect("c.tenants", "tenants")
       .leftJoinAndSelect("r.floor", "f")
       .leftJoinAndSelect("f.building", "b");
 
@@ -82,6 +83,37 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     res.json(contracts);
   } catch (error) {
     console.error("List contracts error:", error);
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+});
+
+// GET /api/contracts/:id — Get a single contract with relations
+router.get("/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const contract = await contractRepo().findOne({
+      where: { id: req.params.id as string },
+      relations: ["room", "representative_tenant", "tenants", "room.floor", "room.floor.building"]
+    });
+
+    if (!contract) {
+      return res.status(404).json({ message: "Không tìm thấy hợp đồng" });
+    }
+
+    // RBAC: Check if user has access to this building
+    const { role, id } = req.user!;
+    const buildingId = contract.room.floor.building_id;
+
+    if (role === UserRole.OWNER) {
+      const building = await buildingRepo().findOne({ where: { id: buildingId, owner_id: id } });
+      if (!building) return res.status(403).json({ message: "Bạn không có quyền xem hợp đồng này" });
+    } else if (role === UserRole.MANAGER) {
+      const assignment = await managerRepo().findOne({ where: { manager_id: id, building_id: buildingId } });
+      if (!assignment) return res.status(403).json({ message: "Bạn không có quyền xem hợp đồng này" });
+    }
+
+    res.json(contract);
+  } catch (error) {
+    console.error("Get contract error:", error);
     res.status(500).json({ message: "Lỗi hệ thống" });
   }
 });

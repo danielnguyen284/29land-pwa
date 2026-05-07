@@ -960,7 +960,7 @@ export default function BuildingDetailPage() {
                     <p className="text-muted-foreground font-medium">Tổng số phòng</p>
                     <div className="flex items-center gap-2">
                       <span className="font-bold">{rooms.length} phòng</span>
-                      <span className="text-emerald-600">({rooms.filter(r => r.status === "OCCUPIED").length} đang ở)</span>
+                      <span className="text-emerald-600">({rooms.filter(r => r.status === "OCCUPIED").length} đang thuê)</span>
                       <span className="text-red-600">({rooms.filter(r => r.status === "EMPTY").length} trống)</span>
                     </div>
                   </div>
