@@ -598,7 +598,7 @@ export default function ContractsPage() {
           </DialogHeader>
           
           <div className="flex gap-2 py-4">
-            {[3, 6, 12].map((m) => (
+            {[3, 6, 9, 12].map((m) => (
               <Button
                 key={m}
                 type="button"

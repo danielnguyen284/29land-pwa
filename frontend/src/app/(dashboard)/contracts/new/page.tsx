@@ -432,7 +432,7 @@ function NewContractForm() {
 
               {formAutoRenew && (
                 <div className="flex gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {[3, 6, 12].map((m) => (
+                  {[3, 6, 9, 12].map((m) => (
                     <Button
                       key={m}
                       type="button"
