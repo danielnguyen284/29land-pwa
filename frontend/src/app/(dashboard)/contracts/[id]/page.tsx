@@ -43,6 +43,7 @@ interface Contract {
   status: "NEW" | "ACTIVE" | "EXPIRED" | "TERMINATED" | "CANCELLED";
   document_photos: string[];
   tenants: Tenant[];
+  auto_renew_months: number | null;
   room: {
     id: string;
     name: string;
@@ -73,6 +74,8 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
   const [formPhotos, setFormPhotos] = useState<string[]>([]);
   const [formAccompanyingTenants, setFormAccompanyingTenants] = useState<AccompanyingTenant[]>([]);
   const [formStatus, setFormStatus] = useState<string>("ACTIVE");
+  const [formAutoRenew, setFormAutoRenew] = useState(false);
+  const [formAutoRenewMonths, setFormAutoRenewMonths] = useState<number>(6);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Terminate Dialog State
@@ -120,6 +123,7 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
     const targetDate = addMonths(start, months);
     const finalEnd = endOfMonth(subDays(targetDate, 1));
     setFormEndDate(format(finalEnd, "yyyy-MM-dd"));
+    setFormAutoRenewMonths(months);
   };
 
   useEffect(() => {
@@ -141,6 +145,8 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
         setFormDeposit(currentContract.deposit_amount.toString());
         setFormPhotos(currentContract.document_photos || []);
         setFormStatus(currentContract.status);
+        setFormAutoRenew(!!currentContract.auto_renew_months);
+        setFormAutoRenewMonths(currentContract.auto_renew_months || 6);
 
         // Initialize accompanying tenants (exclude representative)
         const others = (currentContract.tenants || [])
@@ -320,6 +326,7 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
         deposit_amount: Number(formDeposit),
         document_photos: formPhotos,
         tenant_ids: [formTenantId, ...finalAccompanyingIds],
+        auto_renew_months: formAutoRenew ? formAutoRenewMonths : null,
         status: formStatus
       };
 
@@ -442,6 +449,40 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
                 <Label>Tiền cọc (VND)</Label>
                 <Input type="text" value={formatCurrency(formDeposit)} onChange={e => setFormDeposit(e.target.value.replace(/\D/g, ""))} />
               </div>
+            </div>
+
+            <div className="pt-4 border-t space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Gia hạn tự động</Label>
+                  <p className="text-xs text-muted-foreground italic">
+                    Tự động cộng thêm tháng khi hợp đồng hết hạn
+                  </p>
+                </div>
+                <div 
+                  onClick={() => setFormAutoRenew(!formAutoRenew)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-colors ${formAutoRenew ? 'bg-primary' : 'bg-muted'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formAutoRenew ? 'translate-x-6' : 'translate-x-1'}`} />
+                </div>
+              </div>
+
+              {formAutoRenew && (
+                <div className="flex gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {[3, 6, 12].map((m) => (
+                    <Button
+                      key={m}
+                      type="button"
+                      variant={formAutoRenewMonths === m ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1 rounded-xl"
+                      onClick={() => setFormAutoRenewMonths(m)}
+                    >
+                      {m} tháng
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

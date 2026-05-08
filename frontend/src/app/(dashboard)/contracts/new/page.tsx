@@ -65,6 +65,8 @@ function NewContractForm() {
   const [formNewTenant, setFormNewTenant] = useState({ name: "", phone: "", cccd: "" });
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
+  const [formAutoRenew, setFormAutoRenew] = useState(false);
+  const [formAutoRenewMonths, setFormAutoRenewMonths] = useState<number>(6);
 
   const setDuration = (months: number) => {
     if (!formStartDate) {
@@ -75,6 +77,7 @@ function NewContractForm() {
     const targetDate = addMonths(start, months);
     const finalEnd = endOfMonth(subDays(targetDate, 1));
     setFormEndDate(format(finalEnd, "yyyy-MM-dd"));
+    setFormAutoRenewMonths(months);
   };
   const [formRent, setFormRent] = useState("");
   const [formDeposit, setFormDeposit] = useState("");
@@ -254,6 +257,7 @@ function NewContractForm() {
         deposit_amount: Number(formDeposit),
         document_photos: formPhotos,
         tenant_ids: [finalTenantId, ...finalAccompanyingIds],
+        auto_renew_months: formAutoRenew ? formAutoRenewMonths : null,
         status: "ACTIVE" // Default status for new contract
       };
 
@@ -408,6 +412,40 @@ function NewContractForm() {
                 <Label>Tiền cọc (VND)</Label>
                 <Input type="text" value={formatCurrency(formDeposit)} onChange={e => setFormDeposit(e.target.value.replace(/\D/g, ""))} />
               </div>
+            </div>
+
+            <div className="pt-4 border-t space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Gia hạn tự động</Label>
+                  <p className="text-xs text-muted-foreground italic">
+                    Tự động cộng thêm tháng khi hợp đồng hết hạn
+                  </p>
+                </div>
+                <div 
+                  onClick={() => setFormAutoRenew(!formAutoRenew)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-colors ${formAutoRenew ? 'bg-primary' : 'bg-muted'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formAutoRenew ? 'translate-x-6' : 'translate-x-1'}`} />
+                </div>
+              </div>
+
+              {formAutoRenew && (
+                <div className="flex gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {[3, 6, 12].map((m) => (
+                    <Button
+                      key={m}
+                      type="button"
+                      variant={formAutoRenewMonths === m ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1 rounded-xl"
+                      onClick={() => setFormAutoRenewMonths(m)}
+                    >
+                      {m} tháng
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

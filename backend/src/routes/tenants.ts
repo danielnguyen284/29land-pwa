@@ -118,7 +118,7 @@ router.get("/:roomId/contracts", async (req: AuthRequest, res: Response) => {
 router.post("/:roomId/contracts", requireRole(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER), async (req: AuthRequest, res: Response) => {
   try {
     const room_id = req.params.roomId as string;
-    const { representative_tenant_id, start_date, end_date, rent_amount, deposit_amount, document_photos, tenant_ids } = req.body;
+    const { representative_tenant_id, start_date, end_date, rent_amount, deposit_amount, document_photos, tenant_ids, auto_renew_months } = req.body;
 
     if (!representative_tenant_id || !start_date || !end_date) {
       res.status(400).json({ message: "representative_tenant_id, start_date, end_date là bắt buộc" });
@@ -155,6 +155,7 @@ router.post("/:roomId/contracts", requireRole(UserRole.ADMIN, UserRole.OWNER, Us
       deposit_amount: deposit_amount || 0,
       status: initialContractStatus,
       document_photos: document_photos || [],
+      auto_renew_months: auto_renew_months || null,
     });
 
     const saved = await contractRepo().save(contract);
@@ -193,12 +194,13 @@ router.patch("/:roomId/contracts/:contractId", requireRole(UserRole.ADMIN, UserR
     const contract = await contractRepo().findOneBy({ id: req.params.contractId as string });
     if (!contract) { res.status(404).json({ message: "Không tìm thấy hợp đồng" }); return; }
 
-    const { status, end_date, rent_amount, deposit_amount, document_photos, tenant_ids } = req.body;
+    const { status, end_date, rent_amount, deposit_amount, document_photos, tenant_ids, auto_renew_months } = req.body;
     if (status !== undefined) contract.status = status;
     if (end_date !== undefined) contract.end_date = end_date;
     if (rent_amount !== undefined) contract.rent_amount = rent_amount;
     if (deposit_amount !== undefined) contract.deposit_amount = deposit_amount;
     if (document_photos !== undefined) contract.document_photos = document_photos;
+    if (auto_renew_months !== undefined) contract.auto_renew_months = auto_renew_months;
 
     await contractRepo().save(contract);
 

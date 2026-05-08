@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { apiFetch } from "@/lib/api";
-import { intervalToDuration, isBefore } from "date-fns";
+import { intervalToDuration, isBefore, format } from "date-fns";
 import {
   Ban,
   Building2,
@@ -19,6 +19,14 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
 
 interface Building {
   id: string;
@@ -53,6 +61,7 @@ interface Contract {
   deposit_amount: number;
   status: "NEW" | "ACTIVE" | "EXPIRED" | "TERMINATED" | "CANCELLED";
   document_photos: string[];
+  auto_renew_months: number | null;
   created_at: string;
   room: {
     id: string;
@@ -90,6 +99,8 @@ export default function ContractsPage() {
 
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
+  const [renewingContract, setRenewingContract] = useState<Contract | null>(null);
+  const [isRenewing, setIsRenewing] = useState(false);
 
   useEffect(() => {
     fetchBuildings();
@@ -178,6 +189,36 @@ export default function ContractsPage() {
       toast.error(err.message || "Lỗi khi kích hoạt lại");
     } finally {
       setReactivatingId(null);
+    }
+  };
+  
+  const handleRenew = async (months: number) => {
+    if (!renewingContract) return;
+    
+    try {
+      setIsRenewing(true);
+      const currentEnd = new Date(renewingContract.end_date);
+      
+      // Calculation logic: Set to 1st of month, add months, then get last day of that month
+      const date = new Date(currentEnd);
+      date.setDate(1);
+      date.setMonth(date.getMonth() + months);
+      
+      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      const newEndDateStr = format(lastDay, "yyyy-MM-dd");
+
+      await apiFetch(`/api/rooms/${renewingContract.room.id}/contracts/${renewingContract.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ end_date: newEndDateStr })
+      });
+      
+      toast.success(`Đã gia hạn hợp đồng đến ngày ${format(lastDay, "dd/MM/yyyy")}`);
+      setRenewingContract(null);
+      fetchContracts();
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi gia hạn hợp đồng");
+    } finally {
+      setIsRenewing(false);
     }
   };
 
@@ -514,6 +555,30 @@ export default function ContractsPage() {
                       Hủy
                     </Button>
                   ) : null}
+
+                  {c.status === "ACTIVE" && isExpiring(c.end_date) && (
+                    <>
+                      {c.auto_renew_months ? (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="rounded-md h-7 px-2 text-[10px] sm:text-xs bg-muted opacity-80"
+                          disabled={true}
+                        >
+                          Tự động gia hạn
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="rounded-md h-7 px-2 text-[10px] sm:text-xs text-primary border-primary/50 hover:bg-primary/10"
+                          onClick={(e) => { e.stopPropagation(); setRenewingContract(c); }}
+                        >
+                          Gia hạn
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </div>
               </Card>
               );
@@ -522,15 +587,40 @@ export default function ContractsPage() {
         )}
       </div>
 
-      {/* Floating Action Button for Mobile */}
-      <div className="fixed bottom-0 left-0 w-full p-4 bg-background border-t md:hidden z-20">
-        <Button 
-          className="w-full rounded-2xl py-6 text-base font-semibold bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end hover:opacity-90 text-primary-foreground shadow-lg" 
-          onClick={handleAddClick}
-        >
-          Thêm mới
-        </Button>
-      </div>
+      <Dialog open={!!renewingContract} onOpenChange={(open) => !open && setRenewingContract(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Gia hạn hợp đồng</DialogTitle>
+            <DialogDescription>
+              Chọn thời gian gia hạn cho hợp đồng phòng {renewingContract?.room.name}.
+              Hợp đồng hiện tại hết hạn vào ngày {renewingContract && formatDate(renewingContract.end_date)}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex gap-2 py-4">
+            {[3, 6, 12].map((m) => (
+              <Button
+                key={m}
+                type="button"
+                variant="outline"
+                className="flex-1 py-6 rounded-xl border-primary/20 hover:border-primary hover:bg-primary/5 text-base font-semibold"
+                disabled={isRenewing}
+                onClick={() => handleRenew(m)}
+              >
+                {m} tháng
+              </Button>
+            ))}
+          </div>
+
+          {isRenewing && (
+            <div className="flex items-center justify-center py-2 text-sm text-muted-foreground italic">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Đang thực hiện gia hạn...
+            </div>
+          )}
+
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

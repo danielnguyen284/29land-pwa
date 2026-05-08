@@ -68,6 +68,9 @@ export class Contract {
   @Column({ type: "text", nullable: true })
   notes!: string | null;
 
+  @Column({ type: "int", nullable: true })
+  auto_renew_months!: number | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

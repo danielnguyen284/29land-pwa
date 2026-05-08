@@ -2,19 +2,27 @@ import { AppDataSource } from "../data-source";
 import { Contract, ContractStatus } from "../entities/Contract";
 import { Room, RoomStatus } from "../entities/Room";
 import { Tenant } from "../entities/Tenant";
+import { createNotification } from "../services/notificationService";
+import { NotificationType } from "../entities/Notification";
+import { BuildingManager } from "../entities/BuildingManager";
 
 export const syncExpiredContracts = async () => {
   try {
     const contractRepo = AppDataSource.getRepository(Contract);
     const roomRepo = AppDataSource.getRepository(Room);
     const tenantRepo = AppDataSource.getRepository(Tenant);
+    const managerRepo = AppDataSource.getRepository(BuildingManager);
 
     const today = new Date();
     const todayString = today.toISOString().split("T")[0];
 
     // Find all ACTIVE contracts whose end_date is in the past
+    // Include relations to get building owner and room info for notifications
     const expiredContracts = await contractRepo
       .createQueryBuilder("c")
+      .leftJoinAndSelect("c.room", "r")
+      .leftJoinAndSelect("r.floor", "f")
+      .leftJoinAndSelect("f.building", "b")
       .where("c.status = :status", { status: ContractStatus.ACTIVE })
       .andWhere("c.end_date < :today", { today: todayString })
       .getMany();
@@ -23,9 +31,57 @@ export const syncExpiredContracts = async () => {
       return;
     }
 
-    console.log(`[Cron] Found ${expiredContracts.length} expired contracts. Syncing...`);
+    console.log(`[Cron] Found ${expiredContracts.length} expired contracts. Processing...`);
 
     for (const contract of expiredContracts) {
+      // Check for auto-renewal
+      if (contract.auto_renew_months) {
+        const oldEndDate = contract.end_date;
+        const date = new Date(contract.end_date);
+        
+        // Logic: Add X months, then set to last day of that month
+        // We set to 1st of month first to avoid month-jumping edge cases (e.g. Jan 31 + 1 month)
+        date.setDate(1); 
+        date.setMonth(date.getMonth() + contract.auto_renew_months);
+        
+        // Get last day of the resulting month
+        const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        const newEndDateString = lastDay.toISOString().split("T")[0];
+        
+        contract.end_date = newEndDateString;
+        // Keep status as ACTIVE
+        await contractRepo.save(contract);
+        
+        console.log(`[Cron] Contract ${contract.id} auto-renewed for ${contract.auto_renew_months} months. ${oldEndDate} -> ${newEndDateString}`);
+
+        // --- Send Notifications ---
+        const building = contract.room?.floor?.building;
+        if (building) {
+          const title = "Hợp đồng tự động gia hạn";
+          const content = `Hợp đồng phòng ${contract.room.name} (${building.name}) đã được tự động gia hạn thêm ${contract.auto_renew_months} tháng. Hạn mới: ${newEndDateString}`;
+          
+          // 1. Notify Owner
+          if (building.owner_id) {
+            await createNotification(building.owner_id, title, content, NotificationType.CONTRACT_RENEWED, { 
+              url: `/contracts/${contract.id}`,
+              contract_id: contract.id 
+            });
+          }
+          
+          // 2. Notify Managers
+          const managers = await managerRepo.find({ where: { building_id: building.id } });
+          for (const m of managers) {
+            await createNotification(m.manager_id, title, content, NotificationType.CONTRACT_RENEWED, { 
+              url: `/contracts/${contract.id}`,
+              contract_id: contract.id 
+            });
+          }
+        }
+        
+        continue; // Skip the normal expiration logic
+      }
+
+      // --- Normal Expiration Logic ---
       // 1. Mark contract as EXPIRED
       contract.status = ContractStatus.EXPIRED;
       await contractRepo.save(contract);

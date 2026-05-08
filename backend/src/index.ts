@@ -111,14 +111,14 @@ AppDataSource.initialize()
       console.error("Migration error:", e);
     }
     
-    // Set up hourly cron job (3600000 ms)
+    // Set up hourly cron job (3600000 ms) for invoicing
     setInterval(() => {
-      syncExpiredContracts();
       autoGenerateInvoices();
     }, 60 * 60 * 1000);
 
     // Set up daily cron job at 00:00
     cron.schedule("0 0 * * *", () => {
+      syncExpiredContracts();
       syncFutureContracts();
     });
 
