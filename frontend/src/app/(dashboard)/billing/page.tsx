@@ -254,13 +254,12 @@ export default function BillingPage() {
             <Card key={inv.id} className="hover:shadow-md transition-shadow bg-card border shadow-sm rounded-xl overflow-hidden flex flex-col h-full p-0 gap-0">
               <div className="bg-primary/5 border-b border-primary/10 px-3 py-2.5 sm:px-4 sm:py-3">
                 <div className="font-semibold text-primary truncate text-sm sm:text-base">
-                  {inv.room?.name || "Phòng ?"}
+                  {inv.room?.name || "Phòng ?"} - {formatPeriod(inv.billing_period)}
                 </div>
               </div>
               
               <CardContent className="px-2.5 sm:px-4 pb-3 pt-3 flex-1 flex flex-col space-y-2.5">
-                <div className="flex justify-between items-center pb-1">
-                  <Badge variant="outline" className="font-normal text-[10px] sm:text-xs bg-background px-1.5 py-0 sm:px-2.5 sm:py-0.5">{formatPeriod(inv.billing_period)}</Badge>
+                <div className="flex justify-end items-center pb-1">
                   {getStatusBadge(inv.status)}
                 </div>
                 

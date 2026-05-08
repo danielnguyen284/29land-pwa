@@ -182,7 +182,7 @@ export function RevenueStatistics() {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4">
             <Card className="rounded-2xl border-none shadow-sm">
               <CardContent className="p-5">
                 <div className="flex justify-between items-start">
@@ -228,22 +228,6 @@ export function RevenueStatistics() {
                 </div>
                 <div className="mt-4 text-sm text-muted-foreground">
                   Tổng số khách đang lưu trú
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-2xl border-none shadow-sm">
-              <CardContent className="p-5">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Trung bình thu/tháng</p>
-                    <p className="text-2xl font-bold mt-2">
-                      {formatCompactCurrency(data.chartData.length > 0 ? data.aggregate.totalRevenue / data.chartData.length : 0)}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 text-sm text-muted-foreground">
-                  Trong khoảng thời gian báo cáo
                 </div>
               </CardContent>
             </Card>
