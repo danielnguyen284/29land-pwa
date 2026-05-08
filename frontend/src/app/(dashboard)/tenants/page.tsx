@@ -268,11 +268,11 @@ export default function TenantsPage() {
             options={[
               { value: "ALL", label: "Tất cả nhà" },
               ...buildings.map((b) => {
-                const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+                const fullAddress = [b.address, b.ward].filter(Boolean).join(", ") || "Chưa có địa chỉ";
                 return {
                   value: b.id,
-                  label: fullAddress,
-                  displayLabel: fullAddress,
+                  label: `${b.name} - ${fullAddress}`,
+                  displayLabel: b.name,
                 };
               }),
             ]}
@@ -417,8 +417,8 @@ export default function TenantsPage() {
                       const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
                       return {
                         value: b.id,
-                        label: fullAddress,
-                        displayLabel: fullAddress,
+                        label: `${b.name} - ${fullAddress}`,
+                        displayLabel: b.name,
                       };
                     })}
                     value={formBuildingId}

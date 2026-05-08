@@ -286,11 +286,11 @@ function NewContractForm() {
                 <Label>Nhà <span className="text-destructive">*</span></Label>
                 <SearchableSelect
                   options={buildings.map((b) => {
-                    const fullAddress = [b.address, b.ward, b.district, b.province].filter(Boolean).join(", ") || "Chưa có địa chỉ";
+                    const fullAddress = [b.address, b.ward].filter(Boolean).join(", ") || "Chưa có địa chỉ";
                     return {
                       value: b.id,
-                      label: fullAddress,
-                      displayLabel: fullAddress,
+                      label: `${b.name} - ${fullAddress}`,
+                      displayLabel: b.name,
                     };
                   })}
                   value={formBuildingId}
