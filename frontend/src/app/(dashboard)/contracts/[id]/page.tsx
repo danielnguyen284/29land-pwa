@@ -1,20 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef, use } from "react";
-import { useRouter } from "next/navigation";
-import { format, addMonths, subDays, endOfMonth } from "date-fns";
-import { 
-  ArrowLeft, 
-  Loader2,
-  Camera,
-  Upload,
-  X,
-  Download
-} from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { AccompanyingTenant, AccompanyingTenantsSection } from "@/components/AccompanyingTenantsSection";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Select,
   SelectContent,
@@ -22,9 +13,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchableSelect } from "@/components/ui/searchable-select";
 import { apiFetch } from "@/lib/api";
-import { AccompanyingTenantsSection, AccompanyingTenant } from "@/components/AccompanyingTenantsSection";
+import { addMonths, endOfMonth, format, subDays } from "date-fns";
+import {
+  Camera,
+  Download,
+  Loader2,
+  Upload,
+  X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { use, useEffect, useRef, useState } from "react";
 
 interface Tenant {
   id: string;

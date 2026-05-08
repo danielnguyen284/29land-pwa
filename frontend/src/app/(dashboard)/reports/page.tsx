@@ -41,7 +41,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto min-h-screen">
+    <div className="w-full min-h-screen">
       <RevenueStatistics />
     </div>
   );

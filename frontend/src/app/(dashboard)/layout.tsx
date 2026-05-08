@@ -23,7 +23,8 @@ import {
   FileSignature,
   ClipboardType,
   Sun,
-  Moon
+  Moon,
+  BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PushNotificationHandler } from "@/components/PushNotificationHandler";
@@ -39,6 +40,7 @@ const navItems = [
   { href: "/meter-readings", label: "Chốt số", icon: ClipboardType, roles: ["ADMIN", "MANAGER"] },
   { href: "/billing", label: "Hóa đơn", icon: Receipt, roles: ["ADMIN", "MANAGER"] },
   { href: "/tickets", label: "Công việc", icon: Wrench, roles: ["ADMIN", "MANAGER", "TECHNICIAN"] },
+  { href: "/reports", label: "Thống kê", icon: BarChart3, roles: ["ADMIN", "OWNER"] },
 ];
 
 const BrandLogo = ({ className = "" }: { className?: string }) => (
@@ -150,10 +152,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 };
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-muted/40 md:flex-row">
+    <div className="flex min-h-screen w-full flex-col bg-muted/40 md:flex-row md:h-screen md:overflow-hidden">
       <PushNotificationHandler />
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-col border-r bg-background md:flex">
+      <aside className="hidden w-64 flex-col border-r bg-background md:flex shrink-0">
         <div className="flex h-14 items-center border-b px-4 lg:h-[60px]">
           <Link href="/dashboard" className="flex items-center">
             <BrandLogo />
@@ -311,7 +313,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-y-auto ${pathname === '/dashboard' ? 'md:p-6 lg:p-8' : 'p-4 md:p-6 lg:p-8'}`}>
+      <main className={`flex-1 overflow-y-auto ${pathname === '/dashboard' ? 'p-0' : 'p-4 md:p-6 lg:p-8'}`}>
         {children}
       </main>
     </div>

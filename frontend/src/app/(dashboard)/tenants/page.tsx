@@ -1,26 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { 
-  Users, 
-  Search,
-  Filter,
-  Loader2,
-  Building2,
-  Phone,
-  CreditCard,
-  Home,
-  Plus,
-  Pencil,
-  Power,
-  PowerOff,
-  Check,
-  ChevronsUpDown
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Select,
   SelectContent,
@@ -28,12 +13,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
+import {
+  CreditCard,
+  Home,
+  Loader2,
+  Pencil,
+  Phone,
+  Plus,
+  Search,
+  Users
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 interface Building {
@@ -80,6 +71,8 @@ export default function TenantsPage() {
   
   const [filterSearch, setFilterSearch] = useState("");
   const [filterBuilding, setFilterBuilding] = useState<string>("ALL");
+  const [filterRoom, setFilterRoom] = useState<string>("ALL");
+  const [filterRooms, setFilterRooms] = useState<Room[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
   // Add/Edit Modal State
@@ -104,7 +97,16 @@ export default function TenantsPage() {
       fetchTenants();
     }, 300);
     return () => clearTimeout(timer);
-  }, [filterBuilding, filterStatus, filterSearch]);
+  }, [filterBuilding, filterRoom, filterStatus, filterSearch]);
+
+  useEffect(() => {
+    if (filterBuilding !== "ALL") {
+      fetchRoomsForFilter(filterBuilding);
+    } else {
+      setFilterRooms([]);
+      setFilterRoom("ALL");
+    }
+  }, [filterBuilding]);
 
   useEffect(() => {
     if (formBuildingId && modalMode === "add") {
@@ -130,12 +132,22 @@ export default function TenantsPage() {
     }
   };
 
+  const fetchRoomsForFilter = async (buildingId: string) => {
+    try {
+      const res = await apiFetch<{data: Room[]}>(`/api/rooms?building_id=${buildingId}&limit=1000`);
+      setFilterRooms(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchTenants = async () => {
     setLoading(true);
     try {
       let url = "/api/tenants";
       const params = new URLSearchParams();
       if (filterBuilding !== "ALL") params.append("building_id", filterBuilding);
+      if (filterRoom !== "ALL") params.append("room_id", filterRoom);
       if (filterStatus !== "ALL") params.append("status", filterStatus);
       if (filterSearch) params.append("search", filterSearch);
       
@@ -265,9 +277,28 @@ export default function TenantsPage() {
               }),
             ]}
             value={filterBuilding}
-            onValueChange={(v) => setFilterBuilding(v || "ALL")}
+            onValueChange={(v) => {
+              setFilterBuilding(v || "ALL");
+              setFilterRoom("ALL");
+            }}
             placeholder="Tất cả nhà"
             searchPlaceholder="Tìm kiếm nhà..."
+            className="bg-background rounded-xl w-full h-10"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Phòng</Label>
+          <SearchableSelect
+            options={[
+              { value: "ALL", label: "Tất cả phòng" },
+              ...filterRooms.map((r) => ({ value: r.id, label: r.name })),
+            ]}
+            value={filterRoom}
+            onValueChange={(v) => setFilterRoom(v || "ALL")}
+            placeholder="Tất cả phòng"
+            searchPlaceholder="Tìm kiếm phòng..."
+            emptyMessage="Không tìm thấy phòng."
+            disabled={filterBuilding === "ALL"}
             className="bg-background rounded-xl w-full h-10"
           />
         </div>

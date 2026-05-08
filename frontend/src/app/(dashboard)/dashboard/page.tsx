@@ -1,32 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { 
-  Building2, 
-  Home, 
-  Users, 
-  Banknote, 
-  Loader2,
+import { Card, CardContent } from "@/components/ui/card";
+import { apiFetch } from "@/lib/api";
+import {
   AlertCircle,
+  BarChart3,
+  Building2,
   ChevronDown,
   ChevronUp,
+  Contact,
   Eye,
   EyeOff,
-  AirVent,
-  Contact,
-  FileSignature,
-  Receipt,
-  ClipboardCheck,
-  Siren,
-  Mail,
-  Store,
   FileEdit,
-  QrCode,
-  BarChart3
+  FileSignature,
+  Home,
+  Loader2,
+  Receipt,
+  Users,
+  Wrench
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiFetch } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface DashboardData {
   period: string;
@@ -148,7 +142,7 @@ export default function DashboardPage() {
     { id: "close_numbers", label: "Chốt số", icon: FileEdit, href: "/meter-readings", roles: ["ADMIN", "MANAGER"] },
     // { id: "approvals", label: "Phê duyệt", icon: ClipboardCheck, href: "/approvals", roles: ["ADMIN", "OWNER"] },
     // { id: "finance", label: "Thu chi", icon: Banknote, href: "/finance", roles: ["ADMIN", "MANAGER", "OWNER"] },
-    { id: "incidents", label: "Công việc", icon: Siren, href: "/tickets", roles: ["ADMIN", "MANAGER", "TECHNICIAN", "OWNER"] },
+    { id: "incidents", label: "Công việc", icon: Wrench, href: "/tickets", roles: ["ADMIN", "MANAGER", "TECHNICIAN", "OWNER"] },
     // { id: "feedback", label: "Góp ý", icon: Mail, href: "/feedback", roles: ["ADMIN", "MANAGER"] },
     // { id: "listings", label: "Tin đăng", icon: Store, href: "/listings", roles: ["ADMIN", "MANAGER"] },
     { id: "invoices", label: "Hoá đơn", icon: Receipt, href: "/billing", roles: ["ADMIN", "MANAGER", "OWNER"] },
@@ -164,10 +158,10 @@ export default function DashboardPage() {
 
   return (
     <div 
-      className="pb-10 min-h-screen bg-slate-50/50 dark:bg-background bg-cover bg-center bg-no-repeat bg-fixed bg-[url('/dashboard-bg-modern.svg')] dark:bg-[url('/dashboard-bg-modern-dark.svg')]"
+      className="pb-10 md:pb-16 min-h-screen bg-slate-50/50 dark:bg-background bg-cover bg-center bg-no-repeat bg-fixed bg-[url('/dashboard-bg-modern.svg')] dark:bg-[url('/dashboard-bg-modern-dark.svg')]"
     >
       {/* Top 4 Overlapping Cards */}
-      <div className="pt-6 px-4 max-w-5xl mx-auto relative z-10">
+      <div className="pt-6 md:pt-10 lg:pt-12 px-4 max-w-5xl mx-auto relative z-10">
         <div className="grid grid-cols-2 gap-3 md:gap-4">
           
           {/* Card 1: Phòng trống */}

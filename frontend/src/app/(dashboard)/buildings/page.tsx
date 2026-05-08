@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Building2, Plus, Loader2, Search, MapPin, Home, Info } from "lucide-react";
+import { AddBuildingWizard } from "@/components/buildings/AddBuildingWizard";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiFetch } from "@/lib/api";
-import { AddBuildingWizard } from "@/components/buildings/AddBuildingWizard";
 import {
   Pagination,
   PaginationContent,
@@ -17,6 +13,10 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { apiFetch } from "@/lib/api";
+import { Building2, Home, Info, Loader2, MapPin, Plus, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface Building {
   id: string;

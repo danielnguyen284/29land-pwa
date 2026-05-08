@@ -280,7 +280,7 @@ export default function NewTicketPage() {
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Chọn mức độ ưu tiên" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false} className="w-[var(--radix-select-trigger-width)]">
                   <SelectItem value="LOW">Thấp</SelectItem>
                   <SelectItem value="MEDIUM">Trung bình</SelectItem>
                   <SelectItem value="HIGH">Cao</SelectItem>

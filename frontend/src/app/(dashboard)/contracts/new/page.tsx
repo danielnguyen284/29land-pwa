@@ -1,32 +1,23 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { format, addMonths, addYears, subDays, endOfMonth } from "date-fns";
-import { Suspense } from "react";
-import { 
-  ArrowLeft, 
-  Loader2,
-  Camera,
-  Upload,
-  X,
-  Download
-} from "lucide-react";
-import { toast } from "sonner";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { AccompanyingTenant, AccompanyingTenantsSection } from "@/components/AccompanyingTenantsSection";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { apiFetch } from "@/lib/api";
-import { AccompanyingTenantsSection, AccompanyingTenant } from "@/components/AccompanyingTenantsSection";
+import { addMonths, endOfMonth, format, subDays } from "date-fns";
+import {
+  Camera,
+  Download,
+  Loader2,
+  Upload,
+  X
+} from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface Building {
   id: string;

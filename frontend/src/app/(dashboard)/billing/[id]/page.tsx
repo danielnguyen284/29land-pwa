@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState, useMemo, use } from "react";
-import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, CheckCircle, AlertCircle, Save, Download, Image as ImageIcon } from "lucide-react";
-import { toast } from "sonner";
+import { apiFetch } from "@/lib/api";
 import { toJpeg } from "html-to-image";
+import { AlertCircle, CheckCircle, Image as ImageIcon, Loader2, Save } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { use, useEffect, useState } from "react";
+import { toast } from "sonner";
 interface Building {
   id: string;
   name: string;

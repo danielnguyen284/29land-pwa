@@ -1,27 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { 
-  Building2, 
-  Search,
-  Filter,
-  Loader2,
-  DoorOpen,
-  FileSignature
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -30,6 +11,15 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { apiFetch } from "@/lib/api";
+import {
+  DoorOpen,
+  FileSignature,
+  Loader2
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface Building {
   id: string;

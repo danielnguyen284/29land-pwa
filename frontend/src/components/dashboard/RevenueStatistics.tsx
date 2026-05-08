@@ -1,32 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
-} from "recharts";
 import { format, subMonths } from "date-fns";
-import { vi } from "date-fns/locale";
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Users, 
-  Home, 
-  Building2, 
-  Calendar,
-  Loader2,
-  Filter
+import {
+  Loader2
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Table,
   TableBody,
@@ -187,7 +182,7 @@ export function RevenueStatistics() {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             <Card className="rounded-2xl border-none shadow-sm">
               <CardContent className="p-5">
                 <div className="flex justify-between items-start">
@@ -252,6 +247,22 @@ export function RevenueStatistics() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="rounded-2xl border-none shadow-sm">
+              <CardContent className="p-5">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Trung bình lợi nhuận/tháng</p>
+                    <p className="text-2xl font-bold mt-2 text-emerald-600 dark:text-emerald-400">
+                      {formatCompactCurrency(data.chartData.length > 0 ? data.aggregate.netProfit / data.chartData.length : 0)}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 text-sm text-muted-foreground">
+                  Sau khi trừ tất cả chi phí
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Revenue/Expense Details */}
@@ -295,7 +306,7 @@ export function RevenueStatistics() {
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell className="font-medium">Sửa chữa, bảo trì</TableCell>
+                    <TableCell className="font-medium">Chi phí khác</TableCell>
                     <TableCell><span className="text-rose-600 font-medium bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded text-xs">Chi</span></TableCell>
                     <TableCell className="text-right">{formatCompactCurrency((data.breakdown || { maintenanceExpenses: 0 }).maintenanceExpenses)}</TableCell>
                     <TableCell className="text-right text-muted-foreground text-sm">
@@ -362,6 +373,69 @@ export function RevenueStatistics() {
                     <Bar dataKey="expense" name="Tổng Chi" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={50} activeBar={false} />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pie Chart: Profit vs Expense Ratio */}
+          <Card className="rounded-2xl border-none shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Tỷ lệ Lợi nhuận / Chi phí</CardTitle>
+            </CardHeader>
+            <CardContent className="pb-6">
+              <div className="h-[300px] w-full flex flex-col md:flex-row items-center justify-center">
+                <div className="h-full w-full md:w-1/2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: "Lợi nhuận", value: Math.max(0, data.aggregate.netProfit) },
+                          { name: "Chi phí", value: data.aggregate.totalExpense }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        <Cell fill="var(--primary)" />
+                        <Cell fill="#ef4444" />
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: any) => formatCompactCurrency(Number(value))}
+                        contentStyle={{ 
+                          borderRadius: '12px', 
+                          border: '1px solid var(--border)', 
+                          backgroundColor: 'var(--card)',
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="w-full md:w-1/2 space-y-4 px-4">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-primary" />
+                      <span className="text-sm font-medium">Lợi nhuận</span>
+                    </div>
+                    <span className="text-sm font-bold text-emerald-600">
+                      {data.aggregate.totalRevenue > 0 ? Math.round((data.aggregate.netProfit / data.aggregate.totalRevenue) * 100) : 0}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      <span className="text-sm font-medium">Chi phí</span>
+                    </div>
+                    <span className="text-sm font-bold text-rose-600">
+                      {data.aggregate.totalRevenue > 0 ? Math.round((data.aggregate.totalExpense / data.aggregate.totalRevenue) * 100) : 0}%
+                    </span>
+                  </div>
+                  {/* <p className="text-[11px] text-muted-foreground text-center md:text-left pt-2">
+                    * Tỷ lệ được tính không bao
+                  </p> */}
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -1,21 +1,27 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { format } from "date-fns";
-import { vi } from "date-fns/locale";
-import { Loader2, ArrowLeft, Image as ImageIcon, CheckCircle, XCircle, RefreshCw, Plus, Wrench, Send, Camera, Upload, X } from "lucide-react";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api";
-import { Ticket, TicketExpense, User } from "@/lib/types";
+import { Ticket, User } from "@/lib/types";
+import { format } from "date-fns";
+import { vi } from "date-fns/locale";
+import { Camera, CheckCircle, Loader2, Plus, RefreshCw, Send, Upload, X, XCircle } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 const statusConfig: Record<string, { label: string, color: string }> = {
   PENDING: { label: "Chờ xử lý", color: "bg-amber-100 text-amber-800" },
@@ -51,6 +57,9 @@ export default function TicketDetailsPage() {
   const [assignTechId, setAssignTechId] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [isPriorityDialogOpen, setIsPriorityDialogOpen] = useState(false);
+  const [updatingPriority, setUpdatingPriority] = useState(false);
+  const [newPriority, setNewPriority] = useState("");
 
   // Expense Form State
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
@@ -60,6 +69,7 @@ export default function TicketDetailsPage() {
   const [submittingExpense, setSubmittingExpense] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
+
   const expenseFileInputRef = useRef<HTMLInputElement>(null);
   const evidenceFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -172,6 +182,24 @@ export default function TicketDetailsPage() {
       toast.error(err.message);
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const handleUpdatePriority = async () => {
+    if (!newPriority) return;
+    setUpdatingPriority(true);
+    try {
+      await apiFetch(`/api/tickets/${ticket?.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ priority: newPriority })
+      });
+      toast.success("Đã cập nhật mức độ ưu tiên");
+      setIsPriorityDialogOpen(false);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setUpdatingPriority(false);
     }
   };
 
@@ -318,10 +346,7 @@ export default function TicketDetailsPage() {
             <p className="text-muted-foreground text-sm">Tạo lúc: {format(new Date(ticket.created_at), "dd/MM/yyyy HH:mm", { locale: vi })}</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Badge variant="outline" className={`${priority.color} border-none font-medium px-3 py-1`}>
-            {priority.label}
-          </Badge>
+        <div className="flex gap-2 items-center">
           <Badge variant="outline" className={`${status.color} border-none font-medium px-3 py-1`}>
             {status.label}
           </Badge>
@@ -346,41 +371,43 @@ export default function TicketDetailsPage() {
                 </div>
                 <div>
                   <span className="text-muted-foreground block mb-1">Người phụ trách</span>
-                  {ticket.assigned_tech ? (
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{ticket.assigned_tech.name}</span>
-                      {["ADMIN", "MANAGER"].includes(userRole) && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-7 text-xs bg-muted"
-                          onClick={() => {
-                            setAssignTechId(ticket.assigned_tech_id || "");
-                            setIsAssignDialogOpen(true);
-                          }}
-                        >
-                          Đổi
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground italic">Chưa gán</span>
-                      {["ADMIN", "MANAGER"].includes(userRole) && (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="h-7 px-2 text-xs"
-                          onClick={() => {
-                            setAssignTechId("");
-                            setIsAssignDialogOpen(true);
-                          }}
-                        >
-                          Gán ngay
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{ticket.assigned_tech ? ticket.assigned_tech.name : "Chưa gán"}</span>
+                    {["ADMIN", "MANAGER"].includes(userRole) && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          setAssignTechId(ticket.assigned_tech_id || "");
+                          setIsAssignDialogOpen(true);
+                        }}
+                      >
+                        Đổi
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground block mb-1">Mức độ ưu tiên</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={`${priority.color} border-none font-medium px-3 py-1`}>
+                      {priority.label}
+                    </Badge>
+                    {["ADMIN", "MANAGER"].includes(userRole) && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          setNewPriority(ticket.priority);
+                          setIsPriorityDialogOpen(true);
+                        }}
+                      >
+                        Đổi
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
               <div>
@@ -533,6 +560,38 @@ export default function TicketDetailsPage() {
                         {submittingExpense && <Loader2 className="w-4 h-4 mr-2 animate-spin"/>} Lưu
                       </Button>
                     </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Priority Dialog */}
+                  <Dialog open={isPriorityDialogOpen} onOpenChange={setIsPriorityDialogOpen}>
+                    <DialogContent className="max-w-xs">
+                      <DialogHeader><DialogTitle>Thay đổi mức độ ưu tiên</DialogTitle></DialogHeader>
+                      <div className="py-4">
+                        <Select value={newPriority} onValueChange={(val) => setNewPriority(val || "")}>
+                          <SelectTrigger>
+                            <span data-slot="select-value" className="flex flex-1 text-left line-clamp-1">
+                              {newPriority === "LOW" && "Thấp"}
+                              {newPriority === "MEDIUM" && "Trung bình"}
+                              {newPriority === "HIGH" && "Cao"}
+                              {newPriority === "URGENT" && "Khẩn cấp"}
+                              {!newPriority && "Chọn mức độ ưu tiên"}
+                            </span>
+                          </SelectTrigger>
+                          <SelectContent alignItemWithTrigger={false} className="w-[var(--radix-select-trigger-width)]">
+                            <SelectItem value="LOW">Thấp</SelectItem>
+                            <SelectItem value="MEDIUM">Trung bình</SelectItem>
+                            <SelectItem value="HIGH">Cao</SelectItem>
+                            <SelectItem value="URGENT">Khẩn cấp</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsPriorityDialogOpen(false)}>Hủy</Button>
+                        <Button onClick={handleUpdatePriority} disabled={updatingPriority}>
+                          {updatingPriority && <Loader2 className="w-4 h-4 mr-2 animate-spin"/>} Lưu
+                        </Button>
+                      </DialogFooter>
                     </DialogContent>
                   </Dialog>
 
