@@ -51,6 +51,12 @@ export class Building {
   @Column({ type: "text", nullable: true })
   description!: string;
 
+  @Column({ type: "date", nullable: true })
+  lease_start_date!: string;
+
+  @Column({ type: "int", nullable: true })
+  lease_term_years!: number;
+
   @Column({ type: "jsonb", default: [] })
   fee_configs!: Array<{
     id: string;

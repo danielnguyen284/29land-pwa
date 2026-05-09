@@ -8,6 +8,7 @@ import { UserRole } from "../entities/User";
 import { createNotification } from "../services/notificationService";
 import { NotificationType } from "../entities/Notification";
 import { requireTicketAccess, requireExpenseAccess } from "../middlewares/accessControl";
+import { Contract, ContractStatus } from "../entities/Contract";
 
 const router = Router();
 const ticketRepo = () => AppDataSource.getRepository(Ticket);
@@ -38,7 +39,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
       qb.andWhere("t.assigned_tech_id = :techId", { techId: id });
     } else if (role === UserRole.OWNER) {
       qb.andWhere("building.owner_id = :ownerId", { ownerId: id });
-      qb.andWhere("t.status IN (:...visibleStatuses)", { visibleStatuses: [TicketStatus.WAITING_APPROVAL, TicketStatus.COMPLETED, TicketStatus.NEEDS_EXPLANATION] });
+      qb.andWhere("t.status IN (:...visibleStatuses)", { visibleStatuses: [TicketStatus.WAITING_APPROVAL, TicketStatus.COMPLETED] });
     } else if (role === UserRole.MANAGER) {
       const managerRepo = AppDataSource.getRepository("BuildingManager");
       const assignments = await managerRepo.find({ where: { manager_id: id } });
@@ -92,7 +93,18 @@ router.get("/:id", requireTicketAccess, async (req: AuthRequest, res: Response) 
       order: { created_at: "DESC" },
     });
 
-    res.json({ ...ticket!, expenses });
+    let representative_tenant = null;
+    if (ticket?.room_id) {
+      const contract = await AppDataSource.getRepository(Contract).findOne({
+        where: { room_id: ticket.room_id, status: ContractStatus.ACTIVE },
+        relations: ["representative_tenant"],
+      });
+      if (contract) {
+        representative_tenant = contract.representative_tenant;
+      }
+    }
+
+    res.json({ ...ticket!, expenses, representative_tenant });
   } catch (error) {
     console.error("Get ticket error:", error);
     res.status(500).json({ message: "Lỗi hệ thống" });
@@ -117,7 +129,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
       created_by: req.user!.id,
       priority: priority || TicketPriority.MEDIUM,
       evidence_photos: evidence_photos || [],
-      status: assigned_tech_id ? TicketStatus.IN_PROGRESS : TicketStatus.PENDING,
+      status: TicketStatus.PENDING,
     });
 
     const saved = await ticketRepo().save(ticket);
@@ -162,9 +174,8 @@ router.patch("/:id", requireTicketAccess, async (req: AuthRequest, res: Response
 
     if (assigned_tech_id !== undefined) {
       ticket!.assigned_tech_id = assigned_tech_id;
-      if (assigned_tech_id && ticket!.status === TicketStatus.PENDING) {
-        ticket!.status = TicketStatus.IN_PROGRESS;
-      }
+      // No longer automatically changing to IN_PROGRESS as it's removed. 
+      // Ticket remains PENDING until it goes to WAITING_APPROVAL or COMPLETED.
       if (assigned_tech_id) {
         await createNotification(
           assigned_tech_id,
@@ -181,7 +192,7 @@ router.patch("/:id", requireTicketAccess, async (req: AuthRequest, res: Response
         const unapprovedCount = await expenseRepo().count({
           where: {
             ticket_id: ticket!.id,
-            status: In([ExpenseStatus.PENDING, ExpenseStatus.REJECTED]),
+            status: ExpenseStatus.PENDING,
           }
         });
         if (unapprovedCount > 0) {
@@ -207,13 +218,14 @@ router.post("/:id/expenses", requireTicketAccess, requireRole(UserRole.TECHNICIA
   try {
     const ticket = await ticketRepo().findOneBy({ id: req.params.id as string });
 
-    const { amount, description, receipt_photos } = req.body;
+    const { amount, description, receipt_photos, accounting_period } = req.body;
     if (!amount) { res.status(400).json({ message: "Số tiền là bắt buộc" }); return; }
 
     const expense = expenseRepo().create({
       ticket_id: ticket!.id,
       amount,
       description: description || null,
+      accounting_period: accounting_period || null,
       receipt_photos: receipt_photos || [],
       status: ExpenseStatus.PENDING,
       created_by: req.user!.id
@@ -237,10 +249,11 @@ router.patch("/expenses/:expenseId", requireExpenseAccess, requireRole(UserRole.
       return;
     }
 
-    const { amount, description, receipt_photos } = req.body;
+    const { amount, description, receipt_photos, accounting_period } = req.body;
     if (amount !== undefined) expense!.amount = amount;
     if (description !== undefined) expense!.description = description;
     if (receipt_photos !== undefined) expense!.receipt_photos = receipt_photos;
+    if (accounting_period !== undefined) expense!.accounting_period = accounting_period;
 
     const saved = await expenseRepo().save(expense!);
     res.json(saved);
@@ -250,7 +263,7 @@ router.patch("/expenses/:expenseId", requireExpenseAccess, requireRole(UserRole.
   }
 });
 
-// PATCH /api/tickets/expenses/:expenseId/approve (Owner approves/rejects)
+// PATCH /api/tickets/expenses/:expenseId/approve (Owner approves)
 router.patch("/expenses/:expenseId/approve", requireExpenseAccess, requireRole(UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.user!;
@@ -259,46 +272,22 @@ router.patch("/expenses/:expenseId/approve", requireExpenseAccess, requireRole(U
       relations: ["ticket"],
     });
 
-    const { approved, reject_reason } = req.body;
-
-    if (approved) {
-      expense!.status = ExpenseStatus.APPROVED;
-      expense!.approved_at = new Date();
-      expense!.approved_by = id;
-      expense!.reject_reason = "";
-    } else {
-      expense!.status = ExpenseStatus.REJECTED;
-      if (reject_reason) expense!.reject_reason = reject_reason;
-      
-      await ticketRepo().update(expense!.ticket_id, {
-        status: TicketStatus.NEEDS_EXPLANATION,
-      });
-
-      if (expense!.ticket.assigned_tech_id) {
-        await createNotification(
-          expense!.ticket.assigned_tech_id,
-          "Chi phí bị từ chối",
-          `Chi phí cho công việc "${expense!.ticket.title}" đã bị từ chối.`,
-          NotificationType.TICKET_UPDATED,
-          { ticket_id: expense!.ticket_id }
-        );
-      }
-    }
+    expense!.status = ExpenseStatus.APPROVED;
+    expense!.approved_at = new Date();
+    expense!.approved_by = id;
 
     await expenseRepo().save(expense!);
 
     // Auto-complete ticket if all expenses are approved
-    if (approved) {
-      const remaining = await expenseRepo().count({
-        where: { 
-          ticket_id: expense!.ticket_id, 
-          status: In([ExpenseStatus.PENDING, ExpenseStatus.REJECTED]) 
-        }
-      });
-      if (remaining === 0) {
-        expense!.ticket.status = TicketStatus.COMPLETED;
-        await ticketRepo().save(expense!.ticket);
+    const remaining = await expenseRepo().count({
+      where: { 
+        ticket_id: expense!.ticket_id, 
+        status: ExpenseStatus.PENDING
       }
+    });
+    if (remaining === 0) {
+      expense!.ticket.status = TicketStatus.COMPLETED;
+      await ticketRepo().save(expense!.ticket);
     }
 
     res.json(expense);
@@ -337,13 +326,8 @@ router.post("/:id/expenses/approve-all", requireRole(UserRole.OWNER, UserRole.AD
     }
 
     // Auto-complete ticket
-    const remaining = await expenseRepo().count({
-      where: { ticket_id: ticketId, status: ExpenseStatus.REJECTED }
-    });
-    if (remaining === 0) {
-      ticket.status = TicketStatus.COMPLETED;
-      await ticketRepo().save(ticket);
-    }
+    ticket.status = TicketStatus.COMPLETED;
+    await ticketRepo().save(ticket);
 
     res.json({ message: "Đã duyệt tất cả khoản chi" });
   } catch (error) {
@@ -352,42 +336,6 @@ router.post("/:id/expenses/approve-all", requireRole(UserRole.OWNER, UserRole.AD
   }
 });
 
-// PATCH /api/tickets/expenses/:expenseId/resubmit (Technician resubmits rejected expense)
-router.patch("/expenses/:expenseId/resubmit", requireExpenseAccess, requireRole(UserRole.TECHNICIAN, UserRole.MANAGER, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
-  try {
-    const expense = await expenseRepo().findOne({
-      where: { id: req.params.expenseId as string },
-      relations: ["ticket"],
-    });
-    // expense is guaranteed by requireExpenseAccess
 
-    if (expense!.status !== ExpenseStatus.REJECTED) {
-      res.status(400).json({ message: "Chỉ có thể nộp lại các khoản chi bị từ chối" });
-      return;
-    }
-
-    const { amount, description, receipt_photos, technician_comment } = req.body;
-
-    if (amount) expense!.amount = amount;
-    if (description !== undefined) expense!.description = description;
-    if (receipt_photos) expense!.receipt_photos = receipt_photos;
-    if (technician_comment) expense!.technician_comment = technician_comment;
-    
-    expense!.status = ExpenseStatus.PENDING;
-
-    await expenseRepo().save(expense!);
-
-    if (expense!.ticket.status === TicketStatus.NEEDS_EXPLANATION) {
-      await ticketRepo().update(expense!.ticket_id, {
-        status: TicketStatus.IN_PROGRESS,
-      });
-    }
-
-    res.json(expense);
-  } catch (error) {
-    console.error("Resubmit expense error:", error);
-    res.status(500).json({ message: "Lỗi hệ thống" });
-  }
-});
 
 export default router;

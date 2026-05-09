@@ -1,7 +1,9 @@
 "use client";
 
-import { format, subMonths } from "date-fns";
+import { endOfMonth, format, startOfMonth, subMonths } from "date-fns";
 import {
+  Calendar,
+  ChevronRight,
   Loader2
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -18,6 +20,12 @@ import {
   XAxis,
   YAxis
 } from "recharts";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger
+} from "@/components/ui/select";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -54,6 +62,8 @@ interface RevenueStatsData {
     depositsRevenue: number;
     refundExpenses: number;
     maintenanceExpenses: number;
+    otherIncome: number;
+    otherExpense: number;
   };
   chartData: Array<{
     period: string;
@@ -66,11 +76,11 @@ interface RevenueStatsData {
 export function RevenueStatistics() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("Tất cả");
-  const [startDate, setStartDate] = useState<string>(
-    format(subMonths(new Date(), 5), "yyyy-MM-dd")
+  const [startMonth, setStartMonth] = useState<string>(
+    format(subMonths(new Date(), 5), "yyyy-MM")
   );
-  const [endDate, setEndDate] = useState<string>(
-    format(new Date(), "yyyy-MM-dd")
+  const [endMonth, setEndMonth] = useState<string>(
+    format(new Date(), "yyyy-MM")
   );
   
   const [data, setData] = useState<RevenueStatsData | null>(null);
@@ -94,7 +104,10 @@ export function RevenueStatistics() {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        let url = `/api/reports/revenue-stats?startDate=${startDate}&endDate=${endDate}`;
+        const queryStartDate = format(startOfMonth(new Date(startMonth + "-01")), "yyyy-MM-dd");
+        const queryEndDate = format(endOfMonth(new Date(endMonth + "-01")), "yyyy-MM-dd");
+        
+        let url = `/api/reports/revenue-stats?startDate=${queryStartDate}&endDate=${queryEndDate}`;
         if (selectedBuildingId && selectedBuildingId !== "Tất cả") {
           url += `&building_ids=${selectedBuildingId}`;
         }
@@ -107,7 +120,7 @@ export function RevenueStatistics() {
       }
     };
     fetchStats();
-  }, [startDate, endDate, selectedBuildingId]);
+  }, [startMonth, endMonth, selectedBuildingId]);
 
   const formatCompactCurrency = (value: number) => {
     const absValue = Math.abs(value);
@@ -155,21 +168,53 @@ export function RevenueStatistics() {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Thời gian</Label>
-            <div className="flex items-center gap-2 bg-background border rounded-xl px-3 h-10">
-              <input 
-                type="date" 
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="text-sm bg-transparent border-none outline-none focus:ring-0 flex-1 min-w-[100px]"
-              />
-              <span className="text-muted-foreground font-medium">-</span>
-              <input 
-                type="date" 
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="text-sm bg-transparent border-none outline-none focus:ring-0 flex-1 min-w-[100px] text-right md:text-left"
-              />
+            <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Khoảng thời gian</Label>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <Select value={startMonth} onValueChange={(v) => setStartMonth(v || "")}>
+                  <SelectTrigger className="bg-background rounded-xl h-10 border-muted-foreground/20 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span data-slot="select-value" className="text-sm">
+                        {startMonth ? `Tháng ${format(new Date(startMonth + "-01"), "MM/yyyy")}` : "Từ tháng"}
+                      </span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {Array.from({ length: 36 }).map((_, i) => {
+                      const d = new Date();
+                      d.setMonth(d.getMonth() - 24 + i);
+                      const val = format(d, "yyyy-MM");
+                      const lbl = `Tháng ${format(d, "MM/yyyy")}`;
+                      return <SelectItem key={val} value={val}>{lbl}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <ChevronRight className="w-4 h-4 text-muted-foreground opacity-50" />
+              
+              <div className="flex-1">
+                <Select value={endMonth} onValueChange={(v) => setEndMonth(v || "")}>
+                  <SelectTrigger className="bg-background rounded-xl h-10 border-muted-foreground/20 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span data-slot="select-value" className="text-sm">
+                        {endMonth ? `Tháng ${format(new Date(endMonth + "-01"), "MM/yyyy")}` : "Đến tháng"}
+                      </span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {Array.from({ length: 36 }).map((_, i) => {
+                      const d = new Date();
+                      d.setMonth(d.getMonth() - 24 + i);
+                      const val = format(d, "yyyy-MM");
+                      const lbl = `Tháng ${format(d, "MM/yyyy")}`;
+                      return <SelectItem key={val} value={val}>{lbl}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>
@@ -236,7 +281,7 @@ export function RevenueStatistics() {
               <CardContent className="p-5">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Trung bình lợi nhuận/tháng</p>
+                    <p className="text-sm font-medium text-muted-foreground">Tổng lợi nhuận/tháng</p>
                     <p className="text-2xl font-bold mt-2 text-emerald-600 dark:text-emerald-400">
                       {formatCompactCurrency(data.chartData.length > 0 ? data.aggregate.netProfit / data.chartData.length : 0)}
                     </p>
@@ -265,38 +310,39 @@ export function RevenueStatistics() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">Thu hóa đơn</TableCell>
-                    <TableCell><span className="text-emerald-600 font-medium bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded text-xs">Thu</span></TableCell>
-                    <TableCell className="text-right">{formatCompactCurrency((data.breakdown || { invoicesRevenue: 0 }).invoicesRevenue)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground text-sm">
-                      {data.aggregate.totalRevenue > 0 ? Math.round(((data.breakdown || { invoicesRevenue: 0 }).invoicesRevenue / data.aggregate.totalRevenue) * 100) : 0}%
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Thu cọc</TableCell>
-                    <TableCell><span className="text-emerald-600 font-medium bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded text-xs">Thu</span></TableCell>
-                    <TableCell className="text-right">{formatCompactCurrency((data.breakdown || { depositsRevenue: 0 }).depositsRevenue)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground text-sm">
-                      {data.aggregate.totalRevenue > 0 ? Math.round(((data.breakdown || { depositsRevenue: 0 }).depositsRevenue / data.aggregate.totalRevenue) * 100) : 0}%
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Hoàn cọc</TableCell>
-                    <TableCell><span className="text-rose-600 font-medium bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded text-xs">Chi</span></TableCell>
-                    <TableCell className="text-right">{formatCompactCurrency((data.breakdown || { refundExpenses: 0 }).refundExpenses)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground text-sm">
-                      {data.aggregate.totalExpense > 0 ? Math.round(((data.breakdown || { refundExpenses: 0 }).refundExpenses / data.aggregate.totalExpense) * 100) : 0}%
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Chi phí khác</TableCell>
-                    <TableCell><span className="text-rose-600 font-medium bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded text-xs">Chi</span></TableCell>
-                    <TableCell className="text-right">{formatCompactCurrency((data.breakdown || { maintenanceExpenses: 0 }).maintenanceExpenses)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground text-sm">
-                      {data.aggregate.totalExpense > 0 ? Math.round(((data.breakdown || { maintenanceExpenses: 0 }).maintenanceExpenses / data.aggregate.totalExpense) * 100) : 0}%
-                    </TableCell>
-                  </TableRow>
+                  {[
+                    { name: "Thu hóa đơn", type: "INCOME", amount: (data.breakdown || { invoicesRevenue: 0 }).invoicesRevenue },
+                    { name: "Thu cọc", type: "INCOME", amount: (data.breakdown || { depositsRevenue: 0 }).depositsRevenue },
+                    { name: "Hoàn cọc", type: "EXPENSE", amount: (data.breakdown || { refundExpenses: 0 }).refundExpenses },
+                    { name: "Sửa chữa bảo trì", type: "EXPENSE", amount: (data.breakdown || { maintenanceExpenses: 0 }).maintenanceExpenses },
+                    { name: "Thu khác (Thu chi)", type: "INCOME", amount: (data.breakdown || { otherIncome: 0 }).otherIncome },
+                    { name: "Chi khác (Thu chi)", type: "EXPENSE", amount: (data.breakdown || { otherExpense: 0 }).otherExpense },
+                  ]
+                  .sort((a, b) => {
+                    if (a.type !== b.type) return a.type === "INCOME" ? -1 : 1;
+                    return b.amount - a.amount;
+                  })
+                  .map((item, idx) => {
+                    const totalForType = item.type === "INCOME" ? data.aggregate.totalRevenue : data.aggregate.totalExpense;
+                    const percentage = totalForType > 0 ? Math.round((item.amount / totalForType) * 100) : 0;
+                    
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell>
+                          {item.type === "INCOME" ? (
+                            <span className="text-emerald-600 font-medium bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded text-xs">Thu</span>
+                          ) : (
+                            <span className="text-rose-600 font-medium bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded text-xs">Chi</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">{formatCompactCurrency(item.amount)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground text-sm">
+                          {percentage}%
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

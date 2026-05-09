@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, AlertCircle, Wrench, Clock, CheckCircle2, MessageSquareWarning } from "lucide-react";
+import { Loader2, Plus, AlertCircle, Wrench, Clock, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,8 @@ import {
 
 const statusConfig = {
   PENDING: { label: "Chờ xử lý", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300", badgeColor: "bg-amber-100 text-amber-700", icon: Clock },
-  IN_PROGRESS: { label: "Đang xử lý", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", badgeColor: "bg-blue-100 text-blue-700", icon: Wrench },
   WAITING_APPROVAL: { label: "Chờ duyệt", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300", badgeColor: "bg-purple-100 text-purple-700", icon: Clock },
-  NEEDS_EXPLANATION: { label: "Cần giải trình", color: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300", badgeColor: "bg-rose-100 text-rose-700", icon: MessageSquareWarning },
+
   COMPLETED: { label: "Hoàn thành", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300", badgeColor: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
   OVERDUE: { label: "Quá hạn", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300", badgeColor: "bg-red-100 text-red-700", icon: AlertCircle },
 };
@@ -130,7 +129,7 @@ export default function TicketsPage() {
 
   const getPriorityBadge = (priority: string) => {
     const conf = priorityConfig[priority] || priorityConfig["MEDIUM"];
-    return <span className={`text-[10px] font-medium px-2 py-0.5 rounded-sm border ${conf.color}`}>{conf.label}</span>;
+    return <span className={`text-[10px] font-medium px-2 py-0.5 rounded-sm border whitespace-nowrap flex-shrink-0 ${conf.color}`}>{conf.label}</span>;
   };
 
   return (
@@ -201,20 +200,8 @@ export default function TicketsPage() {
         >
           Chờ xử lý
         </Button>
-        <Button 
-          variant={filterStatus === "IN_PROGRESS" ? "default" : "outline"} 
-          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "IN_PROGRESS" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
-          onClick={() => { setFilterStatus("IN_PROGRESS"); setPage(1); }}
-        >
-          Đang xử lý
-        </Button>
-        <Button 
-          variant={filterStatus === "NEEDS_EXPLANATION" ? "default" : "outline"} 
-          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "NEEDS_EXPLANATION" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
-          onClick={() => { setFilterStatus("NEEDS_EXPLANATION"); setPage(1); }}
-        >
-          Cần giải trình
-        </Button>
+
+
         <Button 
           variant={filterStatus === "WAITING_APPROVAL" ? "default" : "outline"} 
           className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "WAITING_APPROVAL" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
@@ -250,9 +237,9 @@ export default function TicketsPage() {
                   className="hover:shadow-md transition-shadow bg-card border shadow-sm rounded-xl overflow-hidden flex flex-col h-full p-0 gap-0 cursor-pointer"
                   onClick={() => router.push(`/tickets/${ticket.id}`)}
                 >
-                  <div className={`border-b px-3 py-2.5 sm:px-4 sm:py-3 ${ticket.status === 'COMPLETED' ? 'bg-emerald-500/10 border-emerald-500/20' : ticket.status === 'NEEDS_EXPLANATION' ? 'bg-rose-500/10 border-rose-500/20' : 'bg-primary/5 border-primary/10'}`}>
+                  <div className={`border-b px-3 py-2.5 sm:px-4 sm:py-3 ${ticket.status === 'COMPLETED' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-primary/5 border-primary/10'}`}>
                     <div className="flex justify-between items-start gap-2">
-                      <div className={`font-semibold truncate text-sm sm:text-base ${ticket.status === 'COMPLETED' ? 'text-emerald-700' : ticket.status === 'NEEDS_EXPLANATION' ? 'text-rose-700' : 'text-primary'}`}>
+                      <div className={`font-semibold truncate text-sm sm:text-base flex-1 min-w-0 ${ticket.status === 'COMPLETED' ? 'text-emerald-700' : 'text-primary'}`}>
                         {ticket.title}
                       </div>
                       {getPriorityBadge(ticket.priority)}

@@ -6,9 +6,11 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from "typeorm";
 import { Room } from "./Room";
 import { Contract } from "./Contract";
+import { InvoiceItem } from "./InvoiceItem";
 
 export enum InvoiceStatus {
   UNPAID = "UNPAID",
@@ -61,4 +63,7 @@ export class Invoice {
 
   @UpdateDateColumn()
   updated_at!: Date;
+
+  @OneToMany(() => InvoiceItem, (item) => item.invoice)
+  items!: InvoiceItem[];
 }

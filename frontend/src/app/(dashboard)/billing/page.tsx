@@ -11,6 +11,13 @@ import { AlertCircle, CheckCircle, Eye, FileText, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger
+} from "@/components/ui/select";
+import { format } from "date-fns";
 
 export interface Building {
   id: string;
@@ -152,7 +159,7 @@ export default function BillingPage() {
     <div className="space-y-6 pb-20 md:pb-0">
 
       {/* Filters */}
-      <div className="grid gap-3 my-3">
+      <div className="grid gap-4 my-4">
         <div className="space-y-1.5">
           <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Toà nhà</Label>
           <SearchableSelect
@@ -171,34 +178,49 @@ export default function BillingPage() {
             onValueChange={(v) => setFilterBuilding(v || "")}
             placeholder="Tất cả nhà"
             searchPlaceholder="Tìm kiếm nhà..."
-            className="bg-background rounded-xl w-full h-10"
+            className="bg-background rounded-xl w-full h-11 border-muted-foreground/20 shadow-sm"
           />
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Phòng</Label>
-          <SearchableSelect
-            options={[
-              { value: "ALL", label: "Tất cả phòng" },
-              ...rooms.map((r) => ({
-                value: r.id,
-                label: r.name,
-              }))
-            ]}
-            value={filterRoom}
-            onValueChange={setFilterRoom}
-            placeholder="Tất cả phòng"
-            searchPlaceholder="Tìm kiếm phòng..."
-            className="bg-background rounded-xl w-full h-10"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Kỳ hóa đơn</Label>
-          <Input 
-            type="month" 
-            value={filterPeriod} 
-            onChange={(e) => setFilterPeriod(e.target.value)}
-            className="bg-background rounded-xl h-10 w-full"
-          />
+        
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Phòng</Label>
+            <SearchableSelect
+              options={[
+                { value: "ALL", label: "Tất cả phòng" },
+                ...rooms.map((r) => ({
+                  value: r.id,
+                  label: r.name,
+                }))
+              ]}
+              value={filterRoom}
+              onValueChange={setFilterRoom}
+              placeholder="Tất cả phòng"
+              searchPlaceholder="Tìm kiếm phòng..."
+              className="bg-background rounded-xl w-full h-11 border-muted-foreground/20 shadow-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Kỳ hóa đơn</Label>
+            <Select value={filterPeriod} onValueChange={v => setFilterPeriod(v || "")}>
+              <SelectTrigger className="bg-background rounded-xl h-11 w-full border-muted-foreground/20 shadow-sm">
+                <span data-slot="select-value">
+                  {filterPeriod 
+                    ? `Tháng ${format(new Date(filterPeriod), "MM/yyyy")}` 
+                    : "Chọn tháng"}
+                </span>
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {Array.from({ length: 25 }).map((_, i) => {
+                  const d = new Date();
+                  d.setMonth(d.getMonth() - 12 + i);
+                  const val = format(d, "yyyy-MM");
+                  const lbl = `Tháng ${format(d, "MM/yyyy")}`;
+                  return <SelectItem key={val} value={val}>{lbl}</SelectItem>;
+                })}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 

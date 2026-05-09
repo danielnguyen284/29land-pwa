@@ -16,7 +16,7 @@ interface Building {
 interface Room {
   id: string;
   name: string;
-  status: "EMPTY" | "DEPOSITED" | "OCCUPIED";
+  status: "EMPTY" | "DEPOSITED" | "OCCUPIED" | "VACATING_SOON";
   service_subscriptions?: any[];
 }
 
@@ -26,8 +26,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger
+} from "@/components/ui/select";
 import { Save, Loader2, Info, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 interface ConsumptionRecord {
   id: string;
@@ -101,7 +108,7 @@ export default function MeterReadingsPage() {
 
       // Fetch rooms
       const roomsData = await apiFetch<{ data: Room[] }>(`/api/rooms?building_id=${selectedBuildingId}&limit=1000`);
-      const occupiedRooms = (roomsData.data || []).filter((r: Room) => r.status === "OCCUPIED");
+      const occupiedRooms = (roomsData.data || []).filter((r: Room) => r.status === "OCCUPIED" || r.status === "VACATING_SOON");
       setRooms(occupiedRooms);
 
       // Fetch existing consumptions for current and previous period
@@ -268,11 +275,24 @@ export default function MeterReadingsPage() {
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium text-muted-foreground">Kỳ hóa đơn</label>
-          <Input 
-            type="month" 
-            value={billingPeriod} 
-            onChange={(e) => setBillingPeriod(e.target.value)}
-          />
+          <Select value={billingPeriod} onValueChange={v => setBillingPeriod(v || "")}>
+            <SelectTrigger>
+              <span data-slot="select-value">
+                {billingPeriod 
+                  ? `Tháng ${format(new Date(billingPeriod), "MM/yyyy")}` 
+                  : "Chọn tháng"}
+              </span>
+            </SelectTrigger>
+            <SelectContent className="max-h-60">
+              {Array.from({ length: 25 }).map((_, i) => {
+                const d = new Date();
+                d.setMonth(d.getMonth() - 12 + i);
+                const val = format(d, "yyyy-MM");
+                const lbl = `Tháng ${format(d, "MM/yyyy")}`;
+                return <SelectItem key={val} value={val}>{lbl}</SelectItem>;
+              })}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -320,9 +340,11 @@ export default function MeterReadingsPage() {
                       <TableCell>
                         <Badge variant={
                           room.status === "OCCUPIED" ? "default" :
+                          room.status === "VACATING_SOON" ? "secondary" :
                           room.status === "DEPOSITED" ? "secondary" : "outline"
                         }>
                           {room.status === "OCCUPIED" ? "Đang thuê" :
+                           room.status === "VACATING_SOON" ? "Sắp trống" :
                            room.status === "DEPOSITED" ? "Đã cọc" : "Trống"}
                         </Badge>
                       </TableCell>

@@ -44,6 +44,7 @@ interface Contract {
   document_photos: string[];
   tenants: Tenant[];
   auto_renew_months: number | null;
+  is_moving_out: boolean;
   room: {
     id: string;
     name: string;
@@ -76,6 +77,7 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
   const [formStatus, setFormStatus] = useState<string>("ACTIVE");
   const [formAutoRenew, setFormAutoRenew] = useState(false);
   const [formAutoRenewMonths, setFormAutoRenewMonths] = useState<number>(6);
+  const [formIsMovingOut, setFormIsMovingOut] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Terminate Dialog State
@@ -147,6 +149,7 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
         setFormStatus(currentContract.status);
         setFormAutoRenew(!!currentContract.auto_renew_months);
         setFormAutoRenewMonths(currentContract.auto_renew_months || 6);
+        setFormIsMovingOut(currentContract.is_moving_out || false);
 
         // Initialize accompanying tenants (exclude representative)
         const others = (currentContract.tenants || [])
@@ -244,6 +247,32 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
     } finally {
       setFormLoading(false);
     }
+  };
+  
+  const handleToggleNotice = async () => {
+    if (!contract) return;
+    const newValue = !formIsMovingOut;
+    setFormLoading(true);
+    try {
+      await apiFetch(`/api/contracts/${id}/notice-to-move`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_moving_out: newValue })
+      });
+      setFormIsMovingOut(newValue);
+    } catch (err) {
+      alert("Lỗi khi cập nhật báo chuyển");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const isExpiring = (endDateStr: string) => {
+    if (!endDateStr) return false;
+    const today = new Date();
+    const oneMonthLater = new Date();
+    oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+    const end = new Date(endDateStr);
+    return end >= today && end <= oneMonthLater;
   };
 
   const fetchTenants = async (roomId: string) => {
@@ -433,11 +462,6 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label>Ngày kết thúc <span className="text-destructive">*</span></Label>
-                  <div className="flex gap-1">
-                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(3)}>3T</Button>
-                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(6)}>6T</Button>
-                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(12)}>12T</Button>
-                  </div>
                 </div>
                 <Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} required />
               </div>
@@ -468,21 +492,18 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
               </div>
 
               {formAutoRenew && (
-                <div className="flex gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {[3, 6, 9, 12].map((m) => (
-                    <Button
-                      key={m}
-                      type="button"
-                      variant={formAutoRenewMonths === m ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1 rounded-xl"
-                      onClick={() => setFormAutoRenewMonths(m)}
-                    >
-                      {m} tháng
-                    </Button>
-                  ))}
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <Label className="text-xs">Số tháng gia hạn mỗi chu kỳ</Label>
+                  <Input 
+                    type="number" 
+                    min={1} 
+                    value={formAutoRenewMonths} 
+                    onChange={e => setFormAutoRenewMonths(Number(e.target.value))} 
+                    className="max-w-[150px]"
+                  />
                 </div>
               )}
+
             </div>
           </div>
 
@@ -541,13 +562,26 @@ export default function EditContractPage({ params }: { params: Promise<{ id: str
             </Button>
 
             {(formStatus === "ACTIVE" || formStatus === "NEW") && (
-              <div className="flex gap-3">
-                <Button type="button" variant="outline" className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={openCancelDialog} disabled={formLoading}>
-                  Hủy hợp đồng
-                </Button>
-                <Button type="button" variant="destructive" className="flex-1" onClick={openTerminateDialog} disabled={formLoading}>
-                  Thanh lý / Trả phòng
-                </Button>
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={openCancelDialog} disabled={formLoading}>
+                    Hủy hợp đồng
+                  </Button>
+                  <Button type="button" variant="destructive" className="flex-1" onClick={openTerminateDialog} disabled={formLoading}>
+                    Thanh lý / Trả phòng
+                  </Button>
+                </div>
+                {formStatus === "ACTIVE" && (formIsMovingOut || isExpiring(formEndDate)) && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className={`w-full ${formIsMovingOut ? 'bg-orange-500/10 text-orange-600 border-orange-200 hover:bg-orange-500/20' : 'border-primary text-primary hover:bg-primary/5'}`}
+                    onClick={handleToggleNotice}
+                    disabled={formLoading}
+                  >
+                    {formIsMovingOut ? "Hủy báo chuyển (Khách ở tiếp)" : "Báo chuyển (Khách sắp trả phòng)"}
+                  </Button>
+                )}
               </div>
             )}
 

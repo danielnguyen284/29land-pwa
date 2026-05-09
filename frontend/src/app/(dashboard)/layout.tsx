@@ -24,7 +24,8 @@ import {
   ClipboardType,
   Sun,
   Moon,
-  BarChart3
+  BarChart3,
+  Banknote
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PushNotificationHandler } from "@/components/PushNotificationHandler";
@@ -40,6 +41,7 @@ const navItems = [
   { href: "/meter-readings", label: "Chốt số", icon: ClipboardType, roles: ["ADMIN", "MANAGER"] },
   { href: "/billing", label: "Hóa đơn", icon: Receipt, roles: ["ADMIN", "MANAGER"] },
   { href: "/tickets", label: "Công việc", icon: Wrench, roles: ["ADMIN", "MANAGER", "TECHNICIAN"] },
+  { href: "/transactions", label: "Thu chi", icon: Banknote, roles: ["ADMIN", "MANAGER", "OWNER"] },
   { href: "/reports", label: "Thống kê", icon: BarChart3, roles: ["ADMIN", "OWNER"] },
 ];
 

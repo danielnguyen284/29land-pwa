@@ -76,14 +76,7 @@ export async function generateInvoiceForRoom(
   }
 
   const items: Partial<InvoiceItem>[] = [];
-
-  // 1. Base rent
   const rentAmount = Number(room.base_rent) || 0;
-  items.push({
-    fee_id: undefined,
-    description: "Tiền phòng",
-    amount: rentAmount,
-  });
 
   // 2. Service subscriptions (FIXED + CONSUMPTION + PER_CAPITA)
   let fixedTotal = 0;
@@ -114,7 +107,7 @@ export async function generateInvoiceForRoom(
       const cost = occupantCount * price;
       items.push({
         fee_id: sub.fee_id,
-        description: `${feeDef.name}: ${occupantCount} người x ${price.toLocaleString()}`,
+        description: feeDef.name,
         amount: cost,
       });
       perCapitaTotal += cost;
@@ -131,7 +124,7 @@ export async function generateInvoiceForRoom(
         const cost = usage * price;
         items.push({
           fee_id: sub.fee_id,
-          description: `${feeDef.name}: ${record.start_index} → ${record.end_index} = ${usage} x ${price.toLocaleString()}`,
+          description: feeDef.name,
           amount: cost,
         });
         consumptionTotal += cost;

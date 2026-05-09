@@ -190,19 +190,45 @@ router.get("/invoices/:id", async (req: AuthRequest, res: Response) => {
   }
 });
 
-// PATCH /api/invoices/:id — update payment
+// PATCH /api/invoices/:id — update invoice data
 router.patch("/invoices/:id", requireRole(UserRole.ADMIN, UserRole.MANAGER), async (req: AuthRequest, res: Response) => {
   try {
-    const invoice = await invoiceRepo().findOneBy({ id: req.params.id as string });
+    const invoice = await invoiceRepo().findOne({
+      where: { id: req.params.id as string }
+    });
     if (!invoice) { res.status(404).json({ message: "Không tìm thấy hóa đơn" }); return; }
 
-    const { paid_amount, status } = req.body;
+    const { paid_amount, status, rent_amount, rolling_balance, items } = req.body;
+
+    if (rent_amount !== undefined) invoice.rent_amount = rent_amount;
+    if (rolling_balance !== undefined) invoice.rolling_balance = rolling_balance;
+
+    if (items !== undefined && Array.isArray(items)) {
+      // Replace items
+      await itemRepo().delete({ invoice_id: invoice.id });
+      const newItems = items.map((item: any) => itemRepo().create({
+        invoice_id: invoice.id,
+        fee_id: item.fee_id || null,
+        description: item.description,
+        amount: item.amount
+      }));
+      await itemRepo().save(newItems);
+      
+      // Calculate new total
+      const itemsTotal = newItems.reduce((sum, item) => sum + Number(item.amount), 0);
+      invoice.total_amount = Number(invoice.rent_amount) + Number(invoice.rolling_balance) + itemsTotal;
+    }
 
     if (paid_amount !== undefined) {
       invoice.paid_amount = paid_amount;
-      // Auto-determine status from amount
+    }
+
+    // Auto-determine status from amount if status not explicitly provided
+    if (status !== undefined) {
+      invoice.status = status;
+    } else {
       const total = Number(invoice.total_amount);
-      const paid = Number(paid_amount);
+      const paid = Number(invoice.paid_amount);
       if (paid >= total) {
         invoice.status = InvoiceStatus.PAID;
       } else if (paid > 0) {
@@ -212,12 +238,14 @@ router.patch("/invoices/:id", requireRole(UserRole.ADMIN, UserRole.MANAGER), asy
       }
     }
 
-    if (status !== undefined) {
-      invoice.status = status;
-    }
-
     await invoiceRepo().save(invoice);
-    res.json(invoice);
+    
+    // Return updated invoice with items
+    const updated = await invoiceRepo().findOne({
+      where: { id: invoice.id },
+      relations: ["items"]
+    });
+    res.json(updated);
   } catch (error) {
     console.error("Update invoice error:", error);
     res.status(500).json({ message: "Lỗi hệ thống" });

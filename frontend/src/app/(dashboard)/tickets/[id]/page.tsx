@@ -18,16 +18,14 @@ import { apiFetch } from "@/lib/api";
 import { Ticket, User } from "@/lib/types";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { Camera, CheckCircle, Loader2, Plus, RefreshCw, Send, Upload, X, XCircle } from "lucide-react";
+import { Camera, CheckCircle, Loader2, Phone, Plus, RefreshCw, Send, Upload, X, XCircle } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const statusConfig: Record<string, { label: string, color: string }> = {
   PENDING: { label: "Chờ xử lý", color: "bg-amber-100 text-amber-800" },
-  IN_PROGRESS: { label: "Đang xử lý", color: "bg-blue-100 text-blue-800" },
   WAITING_APPROVAL: { label: "Chờ duyệt", color: "bg-purple-100 text-purple-800" },
-  NEEDS_EXPLANATION: { label: "Cần giải trình", color: "bg-rose-100 text-rose-800" },
   COMPLETED: { label: "Hoàn thành", color: "bg-emerald-100 text-emerald-800" },
   OVERDUE: { label: "Quá hạn", color: "bg-red-100 text-red-800" },
 };
@@ -39,10 +37,9 @@ const priorityConfig: Record<string, { label: string, color: string }> = {
   URGENT: { label: "Khẩn cấp", color: "bg-rose-100 text-rose-800 border-rose-200" },
 };
 
-const expenseStatusConfig = {
+const expenseStatusConfig: Record<string, { label: string, color: string }> = {
   PENDING: { label: "Chờ duyệt", color: "bg-amber-100 text-amber-800" },
   APPROVED: { label: "Đã duyệt", color: "bg-emerald-100 text-emerald-800" },
-  REJECTED: { label: "Từ chối", color: "bg-rose-100 text-rose-800" },
 };
 
 export default function TicketDetailsPage() {
@@ -53,18 +50,19 @@ export default function TicketDetailsPage() {
   const [userRole, setUserRole] = useState("");
   const [techs, setTechs] = useState<{value: string, label: string}[]>([]);
   
-  // Dialog States
-  const [assignTechId, setAssignTechId] = useState("");
-  const [assigning, setAssigning] = useState(false);
-  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
-  const [isPriorityDialogOpen, setIsPriorityDialogOpen] = useState(false);
-  const [updatingPriority, setUpdatingPriority] = useState(false);
   const [newPriority, setNewPriority] = useState("");
+  const [assignTechId, setAssignTechId] = useState("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [editingDesc, setEditingDesc] = useState("");
+  const [savingTicket, setSavingTicket] = useState(false);
+  const [updatingPriority, setUpdatingPriority] = useState(false);
 
   // Expense Form State
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseDesc, setExpenseDesc] = useState("");
+  const [expenseAccountingPeriod, setExpenseAccountingPeriod] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [submittingExpense, setSubmittingExpense] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -79,13 +77,7 @@ export default function TicketDetailsPage() {
     setPhotos(newPhotos);
   };
 
-  // Reject / Resubmit State
-  const [rejectReason, setRejectReason] = useState("");
-  const [resubmitComment, setResubmitComment] = useState("");
-  const [activeExpenseId, setActiveExpenseId] = useState("");
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
-  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
-  const [isResubmitDialogOpen, setIsResubmitDialogOpen] = useState(false);
 
   useEffect(() => {
     const userStr = localStorage.getItem("user");
@@ -164,24 +156,29 @@ export default function TicketDetailsPage() {
     }
   };
 
-  const handleAssign = async () => {
-    if (!assignTechId) {
-      toast.error("Vui lòng chọn người phụ trách");
+  const handleSaveTicket = async () => {
+    if (!editingTitle.trim()) {
+      toast.error("Vui lòng nhập tiêu đề");
       return;
     }
-    setAssigning(true);
+    setSavingTicket(true);
     try {
-      await apiFetch(`/api/tickets/${ticket?.id}/assign`, {
+      await apiFetch(`/api/tickets/${ticket?.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ assigned_tech_id: assignTechId })
+        body: JSON.stringify({
+          title: editingTitle,
+          description: editingDesc,
+          priority: newPriority,
+          assigned_tech_id: assignTechId || null
+        })
       });
-      toast.success("Đã phân công người phụ trách");
-      setIsAssignDialogOpen(false);
+      toast.success("Đã cập nhật thông tin công việc");
+      setIsEditDialogOpen(false);
       fetchData();
     } catch (err: any) {
       toast.error(err.message);
     } finally {
-      setAssigning(false);
+      setSavingTicket(false);
     }
   };
 
@@ -194,7 +191,6 @@ export default function TicketDetailsPage() {
         body: JSON.stringify({ priority: newPriority })
       });
       toast.success("Đã cập nhật mức độ ưu tiên");
-      setIsPriorityDialogOpen(false);
       fetchData();
     } catch (err: any) {
       toast.error(err.message);
@@ -271,6 +267,7 @@ export default function TicketDetailsPage() {
           body: JSON.stringify({
             amount: parseFloat(expenseAmount),
             description: expenseDesc,
+            accounting_period: expenseAccountingPeriod,
             receipt_photos: photos
           })
         });
@@ -281,6 +278,7 @@ export default function TicketDetailsPage() {
           body: JSON.stringify({
             amount: parseFloat(expenseAmount),
             description: expenseDesc,
+            accounting_period: expenseAccountingPeriod,
             receipt_photos: photos
           })
         });
@@ -290,6 +288,7 @@ export default function TicketDetailsPage() {
       setEditingExpenseId(null);
       setExpenseAmount("");
       setExpenseDesc("");
+      setExpenseAccountingPeriod("");
       setPhotos([]);
       fetchData();
     } catch (err: any) {
@@ -299,30 +298,13 @@ export default function TicketDetailsPage() {
     }
   };
 
-  const handleApproveExpense = async (expenseId: string, approved: boolean) => {
+  const handleApproveExpense = async (expenseId: string) => {
     try {
       await apiFetch(`/api/tickets/expenses/${expenseId}/approve`, {
         method: "PATCH",
-        body: JSON.stringify({ approved, reject_reason: rejectReason })
+        body: JSON.stringify({})
       });
-      toast.success(approved ? "Đã duyệt chi phí" : "Đã từ chối chi phí");
-      setIsRejectDialogOpen(false);
-      setRejectReason("");
-      fetchData();
-    } catch (err: any) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleResubmitExpense = async () => {
-    try {
-      await apiFetch(`/api/tickets/expenses/${activeExpenseId}/resubmit`, {
-        method: "PATCH",
-        body: JSON.stringify({ technician_comment: resubmitComment })
-      });
-      toast.success("Đã nộp lại giải trình");
-      setIsResubmitDialogOpen(false);
-      setResubmitComment("");
+      toast.success("Đã duyệt chi phí");
       fetchData();
     } catch (err: any) {
       toast.error(err.message);
@@ -347,6 +329,21 @@ export default function TicketDetailsPage() {
           </div>
         </div>
         <div className="flex gap-2 items-center">
+          {["ADMIN", "MANAGER"].includes(userRole) && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setEditingTitle(ticket.title);
+                setEditingDesc(ticket.description || "");
+                setNewPriority(ticket.priority);
+                setAssignTechId(ticket.assigned_tech_id || "");
+                setIsEditDialogOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2 rotate-45 group-hover:rotate-0 transition-transform"/> Sửa thông tin
+            </Button>
+          )}
           <Badge variant="outline" className={`${status.color} border-none font-medium px-3 py-1`}>
             {status.label}
           </Badge>
@@ -368,23 +365,44 @@ export default function TicketDetailsPage() {
                       {[ticket.building.address, ticket.building.ward, ticket.building.district, ticket.building.province].filter(Boolean).join(", ")}
                     </span>
                   )}
+                  {ticket.representative_tenant && (
+                    <div className="mt-2 pt-2 border-t border-dashed">
+                      <span className="text-muted-foreground block mb-1 text-xs">Khách thuê (Đại diện)</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{ticket.representative_tenant.name}</span>
+                        <a 
+                          href={`tel:${ticket.representative_tenant.phone}`} 
+                          className="text-emerald-600 hover:underline flex items-center gap-1 text-xs"
+                        >
+                          <Phone className="w-3 h-3" />
+                          {ticket.representative_tenant.phone}
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <span className="text-muted-foreground block mb-1">Người phụ trách</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{ticket.assigned_tech ? ticket.assigned_tech.name : "Chưa gán"}</span>
-                    {["ADMIN", "MANAGER"].includes(userRole) && (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-7 px-2 text-xs"
-                        onClick={() => {
-                          setAssignTechId(ticket.assigned_tech_id || "");
-                          setIsAssignDialogOpen(true);
-                        }}
-                      >
-                        Đổi
-                      </Button>
+                  <span className="text-muted-foreground block mb-1 text-xs sm:text-sm">Người phụ trách & Người tạo</span>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{ticket.assigned_tech ? ticket.assigned_tech.name : "Chưa gán"}</span>
+                      <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase font-bold">Thợ</span>
+                    </div>
+                    
+                    {ticket.creator && (
+                      <div className="pt-2 border-t border-dashed">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">{ticket.creator.name}</span>
+                          <span className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded uppercase font-bold">Người tạo</span>
+                        </div>
+                        <a 
+                          href={`tel:${ticket.creator.phone}`} 
+                          className="text-emerald-600 hover:underline flex items-center gap-1 text-xs"
+                        >
+                          <Phone className="w-3 h-3" />
+                          {ticket.creator.phone}
+                        </a>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -394,19 +412,6 @@ export default function TicketDetailsPage() {
                     <Badge variant="outline" className={`${priority.color} border-none font-medium px-3 py-1`}>
                       {priority.label}
                     </Badge>
-                    {["ADMIN", "MANAGER"].includes(userRole) && (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-7 px-2 text-xs"
-                        onClick={() => {
-                          setNewPriority(ticket.priority);
-                          setIsPriorityDialogOpen(true);
-                        }}
-                      >
-                        Đổi
-                      </Button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -486,6 +491,7 @@ export default function TicketDetailsPage() {
                     setEditingExpenseId(null);
                     setExpenseAmount("");
                     setExpenseDesc("");
+                    setExpenseAccountingPeriod("");
                     setPhotos([]);
                     setIsExpenseDialogOpen(true);
                   }}>
@@ -496,9 +502,32 @@ export default function TicketDetailsPage() {
                     <DialogContent>
                       <DialogHeader><DialogTitle>{editingExpenseId ? "Chỉnh sửa chi phí" : "Báo cáo chi phí"}</DialogTitle></DialogHeader>
                     <div className="space-y-4 py-4">
-                      <div>
-                        <Label>Số tiền (VND) <span className="text-red-500">*</span></Label>
-                        <Input type="number" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} placeholder="50000" />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Số tiền (VND) <span className="text-red-500">*</span></Label>
+                          <Input type="number" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} placeholder="50000" />
+                        </div>
+                        <div>
+                          <Label>Tháng hoạch toán</Label>
+                          <Select value={expenseAccountingPeriod} onValueChange={val => setExpenseAccountingPeriod(val || "")}>
+                            <SelectTrigger>
+                              <span data-slot="select-value">
+                                {expenseAccountingPeriod 
+                                  ? `Tháng ${format(new Date(expenseAccountingPeriod), "MM/yyyy")}` 
+                                  : "Chọn tháng"}
+                              </span>
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60">
+                              {Array.from({ length: 25 }).map((_, i) => {
+                                const d = new Date();
+                                d.setMonth(d.getMonth() - 12 + i);
+                                const val = format(d, "yyyy-MM");
+                                const lbl = `Tháng ${format(d, "MM/yyyy")}`;
+                                return <SelectItem key={val} value={val}>{lbl}</SelectItem>;
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       <div>
                         <Label>Mô tả (linh kiện, công...)</Label>
@@ -562,51 +591,50 @@ export default function TicketDetailsPage() {
                     </DialogFooter>
                     </DialogContent>
                   </Dialog>
-
-                  {/* Priority Dialog */}
-                  <Dialog open={isPriorityDialogOpen} onOpenChange={setIsPriorityDialogOpen}>
-                    <DialogContent className="max-w-xs">
-                      <DialogHeader><DialogTitle>Thay đổi mức độ ưu tiên</DialogTitle></DialogHeader>
-                      <div className="py-4">
-                        <Select value={newPriority} onValueChange={(val) => setNewPriority(val || "")}>
-                          <SelectTrigger>
-                            <span data-slot="select-value" className="flex flex-1 text-left line-clamp-1">
-                              {newPriority === "LOW" && "Thấp"}
-                              {newPriority === "MEDIUM" && "Trung bình"}
-                              {newPriority === "HIGH" && "Cao"}
-                              {newPriority === "URGENT" && "Khẩn cấp"}
-                              {!newPriority && "Chọn mức độ ưu tiên"}
-                            </span>
-                          </SelectTrigger>
-                          <SelectContent alignItemWithTrigger={false} className="w-[var(--radix-select-trigger-width)]">
-                            <SelectItem value="LOW">Thấp</SelectItem>
-                            <SelectItem value="MEDIUM">Trung bình</SelectItem>
-                            <SelectItem value="HIGH">Cao</SelectItem>
-                            <SelectItem value="URGENT">Khẩn cấp</SelectItem>
-                          </SelectContent>
-                        </Select>
+ 
+                  {/* Unified Edit Dialog */}
+                  <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader><DialogTitle>Chỉnh sửa công việc</DialogTitle></DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Tiêu đề <span className="text-red-500">*</span></Label>
+                          <Input value={editingTitle} onChange={e => setEditingTitle(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Mô tả chi tiết</Label>
+                          <Textarea value={editingDesc} onChange={e => setEditingDesc(e.target.value)} rows={4} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Mức độ ưu tiên</Label>
+                            <Select value={newPriority} onValueChange={(val) => setNewPriority(val || "")}>
+                              <SelectTrigger>
+                                <span data-slot="select-value">
+                                  {newPriority === "LOW" && "Thấp"}
+                                  {newPriority === "MEDIUM" && "Trung bình"}
+                                  {newPriority === "HIGH" && "Cao"}
+                                  {newPriority === "URGENT" && "Khẩn cấp"}
+                                </span>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="LOW">Thấp</SelectItem>
+                                <SelectItem value="MEDIUM">Trung bình</SelectItem>
+                                <SelectItem value="HIGH">Cao</SelectItem>
+                                <SelectItem value="URGENT">Khẩn cấp</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Người phụ trách</Label>
+                            <SearchableSelect options={techs} value={assignTechId} onValueChange={setAssignTechId} placeholder="Chọn..." />
+                          </div>
+                        </div>
                       </div>
                       <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsPriorityDialogOpen(false)}>Hủy</Button>
-                        <Button onClick={handleUpdatePriority} disabled={updatingPriority}>
-                          {updatingPriority && <Loader2 className="w-4 h-4 mr-2 animate-spin"/>} Lưu
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-
-                  {/* Assignment Dialog */}
-                  <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-                    <DialogContent>
-                      <DialogHeader><DialogTitle>Phân công người phụ trách</DialogTitle></DialogHeader>
-                      <div className="py-4">
-                        <Label>Chọn người phụ trách</Label>
-                        <SearchableSelect options={techs} value={assignTechId} onValueChange={setAssignTechId} placeholder="Chọn..." />
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>Hủy</Button>
-                        <Button onClick={handleAssign} disabled={assigning}>
-                          {assigning && <Loader2 className="w-4 h-4 mr-2 animate-spin"/>} Lưu
+                        <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Hủy</Button>
+                        <Button onClick={handleSaveTicket} disabled={savingTicket}>
+                          {savingTicket && <Loader2 className="w-4 h-4 mr-2 animate-spin"/>} Lưu thay đổi
                         </Button>
                       </DialogFooter>
                     </DialogContent>
@@ -630,6 +658,7 @@ export default function TicketDetailsPage() {
                             setEditingExpenseId(exp.id);
                             setExpenseAmount(exp.amount.toString());
                             setExpenseDesc(exp.description || "");
+                            setExpenseAccountingPeriod(exp.accounting_period || "");
                             setPhotos(exp.receipt_photos || []);
                             setIsExpenseDialogOpen(true);
                           }
@@ -657,6 +686,13 @@ export default function TicketDetailsPage() {
                             </span>
                           </div>
                           
+                          {exp.accounting_period && (
+                            <div className="flex">
+                              <span className="text-muted-foreground w-24 shrink-0">Hoạch toán:</span>
+                              <span className="flex-1 font-medium text-emerald-700">Tháng {format(new Date(exp.accounting_period), "MM/yyyy")}</span>
+                            </div>
+                          )}
+
                           {exp.description && (
                             <div className="flex">
                               <span className="text-muted-foreground w-24 shrink-0">Mô tả:</span>
@@ -678,68 +714,12 @@ export default function TicketDetailsPage() {
                           )}
                         </div>
 
-                        {exp.reject_reason && (
-                          <div className="bg-rose-50 text-rose-800 p-2 rounded text-sm mt-2">
-                            <span className="font-semibold">Lý do từ chối:</span> {exp.reject_reason}
-                          </div>
-                        )}
-
-                        {exp.technician_comment && (
-                          <div className="bg-blue-50 text-blue-800 p-2 rounded text-sm mt-2">
-                            <span className="font-semibold">Giải trình:</span> {exp.technician_comment}
-                          </div>
-                        )}
-
                         {/* Owner Actions */}
                         {userRole === "OWNER" && exp.status === "PENDING" && (
                           <div className="flex gap-2 pt-2 border-t">
-                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleApproveExpense(exp.id, true)}>
+                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 w-full" onClick={(e) => { e.stopPropagation(); handleApproveExpense(exp.id); }}>
                               <CheckCircle className="w-4 h-4 mr-1"/> Duyệt
                             </Button>
-                            
-                            <Dialog open={isRejectDialogOpen && activeExpenseId === exp.id} onOpenChange={(open) => { setIsRejectDialogOpen(open); setActiveExpenseId(exp.id); }}>
-                              <DialogTrigger render={<Button size="sm" variant="destructive" />}>
-                                <XCircle className="w-4 h-4 mr-1"/> Từ chối
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader><DialogTitle>Từ chối chi phí</DialogTitle></DialogHeader>
-                                <div className="py-4">
-                                  <Label>Lý do từ chối (Bắt buộc)</Label>
-                                  <Textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
-                                </div>
-                                <DialogFooter>
-                                  <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>Hủy</Button>
-                                  <Button variant="destructive" onClick={() => handleApproveExpense(exp.id, false)} disabled={!rejectReason.trim()}>Xác nhận từ chối</Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
-                          </div>
-                        )}
-
-                        {/* Tech/Manager Actions */}
-                        {["TECHNICIAN", "MANAGER", "ADMIN"].includes(userRole) && exp.status === "REJECTED" && (
-                          <div className="pt-2 border-t">
-                             <Dialog open={isResubmitDialogOpen && activeExpenseId === exp.id} onOpenChange={(open) => { setIsResubmitDialogOpen(open); setActiveExpenseId(exp.id); }}>
-                              <DialogTrigger render={<Button size="sm" variant="outline" className="w-full text-blue-600 border-blue-200 hover:bg-blue-50 whitespace-normal h-auto py-1.5" />}>
-                                <RefreshCw className="w-4 h-4 mr-1 shrink-0"/> <span>Giải trình & Nộp lại</span>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader><DialogTitle>Giải trình chi phí</DialogTitle></DialogHeader>
-                                <div className="py-4 space-y-4">
-                                  <div className="bg-rose-50 text-rose-800 p-3 rounded text-sm">
-                                    <span className="font-semibold">Lý do từ chối trước đó:</span> {exp.reject_reason}
-                                  </div>
-                                  <div>
-                                    <Label>Nhập giải trình của bạn</Label>
-                                    <Textarea value={resubmitComment} onChange={e => setResubmitComment(e.target.value)} />
-                                  </div>
-                                </div>
-                                <DialogFooter>
-                                  <Button variant="outline" onClick={() => setIsResubmitDialogOpen(false)}>Hủy</Button>
-                                  <Button onClick={handleResubmitExpense} disabled={!resubmitComment.trim()}>Gửi giải trình</Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
                           </div>
                         )}
                       </div>

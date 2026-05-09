@@ -85,10 +85,17 @@ router.get("/", async (req: AuthRequest, res: Response) => {
       const countMap = new Map();
       roomCounts.forEach((row: any) => countMap.set(row.building_id, parseInt(row.count, 10)));
       
-      const result = buildings.map(b => ({
-        ...b,
-        rooms_count: countMap.get(b.id) || 0
-      }));
+      const result = buildings.map(b => {
+        const item = {
+          ...b,
+          rooms_count: countMap.get(b.id) || 0
+        };
+        if (role !== UserRole.ADMIN && role !== UserRole.OWNER) {
+          delete (item as any).lease_start_date;
+          delete (item as any).lease_term_years;
+        }
+        return item;
+      });
       
       res.json({
         data: result,
@@ -113,7 +120,8 @@ router.post("/", requireRole(UserRole.ADMIN), async (req: AuthRequest, res: Resp
     const { 
       name, address, province, district, ward, 
       invoice_closing_date, payment_deadline_date, building_type, description,
-      fee_configs, owner_id, manager_ids, floors, room_classes, payment_qr_code
+      fee_configs, owner_id, manager_ids, floors, room_classes, payment_qr_code,
+      lease_start_date, lease_term_years
     } = req.body;
     if (!name) { res.status(400).json({ message: "Tên tòa nhà là bắt buộc" }); return; }
 
@@ -133,6 +141,8 @@ router.post("/", requireRole(UserRole.ADMIN), async (req: AuthRequest, res: Resp
         description: description || null,
         fee_configs: fee_configs || [],
         payment_qr_code: payment_qr_code || null,
+        lease_start_date: lease_start_date || null,
+        lease_term_years: lease_term_years || null,
       });
 
       const savedBuilding = await transactionalEntityManager.save(building);
@@ -218,6 +228,11 @@ router.get("/:id", requireBuildingAccess, async (req: AuthRequest, res: Response
       managers = managerUsers.map(u => ({ id: u.id, name: u.name, phone: u.phone }));
     }
 
+    if (req.user!.role !== UserRole.ADMIN && req.user!.role !== UserRole.OWNER) {
+      delete (building as any).lease_start_date;
+      delete (building as any).lease_term_years;
+    }
+
     res.json({ ...building, managers });
   } catch (error) {
     console.error("Get building error:", error);
@@ -264,6 +279,8 @@ router.patch("/:id", requireRole(UserRole.ADMIN, UserRole.OWNER), requireBuildin
     if (req.body.description !== undefined) building.description = req.body.description;
     if (req.body.fee_configs !== undefined) building.fee_configs = req.body.fee_configs;
     if (payment_qr_code !== undefined) building.payment_qr_code = payment_qr_code;
+    if (req.body.lease_start_date !== undefined) building.lease_start_date = req.body.lease_start_date;
+    if (req.body.lease_term_years !== undefined) building.lease_term_years = req.body.lease_term_years;
 
     await AppDataSource.transaction(async (transactionalEntityManager) => {
       await transactionalEntityManager.save(building);

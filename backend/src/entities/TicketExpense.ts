@@ -11,7 +11,6 @@ import { Ticket } from "./Ticket";
 export enum ExpenseStatus {
   PENDING = "PENDING",
   APPROVED = "APPROVED",
-  REJECTED = "REJECTED",
 }
 
 @Entity("ticket_expenses")
@@ -32,17 +31,14 @@ export class TicketExpense {
   @Column({ type: "text", nullable: true })
   description!: string;
 
+  @Column({ nullable: true })
+  accounting_period!: string; // YYYY-MM
+
   @Column({ type: "jsonb", default: [] })
   receipt_photos!: string[];
 
   @Column({ type: "enum", enum: ExpenseStatus, default: ExpenseStatus.PENDING })
   status!: ExpenseStatus;
-
-  @Column({ type: "text", nullable: true })
-  reject_reason!: string;
-
-  @Column({ type: "text", nullable: true })
-  technician_comment!: string;
 
   @Column({ nullable: true })
   created_by!: string;

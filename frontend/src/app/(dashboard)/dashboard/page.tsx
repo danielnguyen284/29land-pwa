@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
 import {
   AlertCircle,
+  Banknote,
   BarChart3,
   Building2,
   ChevronDown,
@@ -141,7 +142,7 @@ export default function DashboardPage() {
     { id: "customers", label: "Khách hàng", icon: Users, href: "/tenants", roles: ["ADMIN", "MANAGER"] },
     { id: "close_numbers", label: "Chốt số", icon: FileEdit, href: "/meter-readings", roles: ["ADMIN", "MANAGER"] },
     // { id: "approvals", label: "Phê duyệt", icon: ClipboardCheck, href: "/approvals", roles: ["ADMIN", "OWNER"] },
-    // { id: "finance", label: "Thu chi", icon: Banknote, href: "/finance", roles: ["ADMIN", "MANAGER", "OWNER"] },
+    { id: "finance", label: "Thu chi", icon: Banknote, href: "/transactions", roles: ["ADMIN", "MANAGER", "OWNER"] },
     { id: "incidents", label: "Công việc", icon: Wrench, href: "/tickets", roles: ["ADMIN", "MANAGER", "TECHNICIAN", "OWNER"] },
     // { id: "feedback", label: "Góp ý", icon: Mail, href: "/feedback", roles: ["ADMIN", "MANAGER"] },
     // { id: "listings", label: "Tin đăng", icon: Store, href: "/listings", roles: ["ADMIN", "MANAGER"] },

@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { apiFetch } from "@/lib/api";
@@ -14,10 +15,19 @@ import {
   Info,
   Loader2,
   Plus,
-  RefreshCw
+  RefreshCw,
+  MoreVertical,
+  LogOut,
+  Trash2,
+  AlertCircle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from "@/components/ui/popover";
 import { toast } from "sonner";
 import { 
   Dialog, 
@@ -62,6 +72,7 @@ interface Contract {
   status: "NEW" | "ACTIVE" | "EXPIRED" | "TERMINATED" | "CANCELLED";
   document_photos: string[];
   auto_renew_months: number | null;
+  is_moving_out: boolean;
   created_at: string;
   room: {
     id: string;
@@ -96,15 +107,31 @@ export default function ContractsPage() {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("Tất cả");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("Tất cả");
   const [activeTab, setActiveTab] = useState<TabKey>("ALL");
+  const [userRole, setUserRole] = useState<string>("");
 
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [renewingContract, setRenewingContract] = useState<Contract | null>(null);
   const [isRenewing, setIsRenewing] = useState(false);
+  const [renewalMonths, setRenewalMonths] = useState<number>(6);
+  const [terminatingContract, setTerminatingContract] = useState<Contract | null>(null);
+  const [terminateDate, setTerminateDate] = useState("");
+  const [terminateLastMonthRent, setTerminateLastMonthRent] = useState("");
+  const [terminateDamageFees, setTerminateDamageFees] = useState("");
+  const [terminateNotes, setTerminateNotes] = useState("");
+  const [isTerminating, setIsTerminating] = useState(false);
 
   useEffect(() => {
     fetchBuildings();
-    fetchContracts();
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        setUserRole(user.role);
+      } catch (e) {
+        console.error(e);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -220,6 +247,57 @@ export default function ContractsPage() {
     } finally {
       setIsRenewing(false);
     }
+  };
+
+  const handleToggleNotice = async (contract: Contract) => {
+    const newValue = !contract.is_moving_out;
+    try {
+      await apiFetch(`/api/contracts/${contract.id}/notice-to-move`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_moving_out: newValue })
+      });
+      toast.success(newValue ? "Đã đánh dấu báo chuyển (sắp trống)" : "Đã hủy báo chuyển");
+      fetchContracts();
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi cập nhật báo chuyển");
+    }
+  };
+
+  const handleTerminate = async () => {
+    if (!terminatingContract) return;
+    try {
+      setIsTerminating(true);
+      await apiFetch(`/api/rooms/${terminatingContract.room_id}/contracts/${terminatingContract.id}/terminate`, {
+        method: "POST",
+        body: JSON.stringify({
+          actual_end_date: terminateDate,
+          last_month_rent: Number(terminateLastMonthRent.replace(/\D/g, "") || 0),
+          damage_fees: Number(terminateDamageFees.replace(/\D/g, "") || 0),
+          notes: terminateNotes
+        })
+      });
+      toast.success("Đã thanh lý hợp đồng thành công");
+      setTerminatingContract(null);
+      fetchContracts();
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi thanh lý hợp đồng");
+    } finally {
+      setIsTerminating(false);
+    }
+  };
+
+  const formatCurrencyInput = (val: string) => {
+    const num = val.replace(/\D/g, "");
+    if (!num) return "";
+    return new Intl.NumberFormat("vi-VN").format(parseInt(num));
+  };
+
+  const openTerminateDialog = (contract: Contract) => {
+    setTerminatingContract(contract);
+    setTerminateDate(new Date().toISOString().split("T")[0]);
+    setTerminateLastMonthRent("");
+    setTerminateDamageFees("");
+    setTerminateNotes("");
   };
 
   // Helper to categorize contracts
@@ -456,10 +534,95 @@ export default function ContractsPage() {
                 className="hover:shadow-md transition-shadow cursor-pointer bg-card border shadow-sm rounded-xl overflow-hidden flex flex-col p-0 gap-0"
                 onClick={() => handleContractClick(c)}
               >
-                <div className="bg-primary/5 border-b border-primary/10 px-3 py-2.5 sm:px-4 sm:py-3">
-                  <div className="font-semibold text-primary truncate text-sm sm:text-base">
+                <div className="bg-primary/5 border-b border-primary/10 px-3 py-2.5 sm:px-4 sm:py-3 relative flex justify-between items-center">
+                  <div className="font-semibold text-primary truncate text-sm sm:text-base pr-2">
                     {c.representative_tenant?.name || "Khách thuê"}
                   </div>
+                  
+                  <Popover>
+                    <PopoverTrigger
+                      render={
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-full hover:bg-primary/10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-4 w-4 text-primary/70" />
+                        </Button>
+                      }
+                    />
+                    <PopoverContent className="w-48 p-1" align="end" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-col gap-0.5">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="justify-start font-normal h-9 px-3 rounded-md"
+                          onClick={() => handleContractClick(c)}
+                        >
+                          <Info className="h-4 w-4 mr-2" /> Chi tiết
+                        </Button>
+
+                        {c.status === "ACTIVE" && !isTerminated && (
+                          <>
+                            {!c.auto_renew_months && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="justify-start font-normal h-9 px-3 rounded-md text-primary"
+                                onClick={() => setRenewingContract(c)}
+                              >
+                                <RefreshCw className="h-4 w-4 mr-2" /> Gia hạn
+                              </Button>
+                            )}
+
+                            {(c.is_moving_out || isExpiring(c.end_date)) && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className={`justify-start font-normal h-9 px-3 rounded-md ${c.is_moving_out ? 'text-orange-600 bg-orange-50' : ''}`}
+                                onClick={() => handleToggleNotice(c)}
+                              >
+                                <LogOut className="h-4 w-4 mr-2" /> 
+                                {c.is_moving_out ? "Hủy báo chuyển" : "Báo chuyển"}
+                              </Button>
+                            )}
+
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="justify-start font-normal h-9 px-3 rounded-md text-destructive hover:bg-destructive/5"
+                              onClick={() => openTerminateDialog(c)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Thanh lý / Trả phòng
+                            </Button>
+                          </>
+                        )}
+
+                        {(c.status === "ACTIVE" || c.status === "NEW") && !isTerminated && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="justify-start font-normal h-9 px-3 rounded-md text-destructive hover:bg-destructive/5"
+                            onClick={() => handleCancelContract(c)}
+                          >
+                            <Ban className="h-4 w-4 mr-2" /> Hủy hợp đồng
+                          </Button>
+                        )}
+
+                        {c.status === "CANCELLED" && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="justify-start font-normal h-9 px-3 rounded-md text-primary"
+                            onClick={() => handleReactivateContract(c)}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" /> Kích hoạt lại
+                          </Button>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <CardContent className="px-2.5 sm:px-4 pb-2 pt-3 space-y-2.5 flex-1">
                   {c.status === "ACTIVE" && isExpiring(c.end_date) ? (
@@ -521,65 +684,6 @@ export default function ContractsPage() {
                     </span>
                   </div>
                 </CardContent>
-
-                <div className="p-2 sm:p-4 pt-0 mt-auto flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-                  {isTerminated ? (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="rounded-md h-7 px-2 text-[10px] sm:text-xs text-muted-foreground"
-                      disabled={true}
-                    >
-                      Đã thanh lý
-                    </Button>
-                  ) : c.status === "CANCELLED" ? (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="rounded-md h-7 px-2 text-[10px] sm:text-xs"
-                      onClick={(e) => { e.stopPropagation(); handleReactivateContract(c); }}
-                      disabled={reactivatingId === c.id || cancelingId === c.id}
-                    >
-                      {reactivatingId === c.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                      Kích hoạt lại
-                    </Button>
-                  ) : c.status === "ACTIVE" ? (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="rounded-md h-7 px-2 text-[10px] sm:text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={(e) => { e.stopPropagation(); handleCancelContract(c); }}
-                      disabled={cancelingId === c.id || reactivatingId === c.id}
-                    >
-                      {cancelingId === c.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Ban className="h-3 w-3 mr-1" />}
-                      Hủy
-                    </Button>
-                  ) : null}
-
-                  {c.status === "ACTIVE" && isExpiring(c.end_date) && (
-                    <>
-                      {c.auto_renew_months ? (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="rounded-md h-7 px-2 text-[10px] sm:text-xs bg-muted opacity-80"
-                          disabled={true}
-                        >
-                          Tự động gia hạn
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="rounded-md h-7 px-2 text-[10px] sm:text-xs text-primary border-primary/50 hover:bg-primary/10"
-                          onClick={(e) => { e.stopPropagation(); setRenewingContract(c); }}
-                        >
-                          Gia hạn
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
               </Card>
               );
             })}
@@ -597,30 +701,115 @@ export default function ContractsPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex gap-2 py-4">
-            {[3, 6, 9, 12].map((m) => (
-              <Button
-                key={m}
-                type="button"
-                variant="outline"
-                className="flex-1 py-6 rounded-xl border-primary/20 hover:border-primary hover:bg-primary/5 text-base font-semibold"
-                disabled={isRenewing}
-                onClick={() => handleRenew(m)}
-              >
-                {m} tháng
-              </Button>
-            ))}
-          </div>
-
-          {isRenewing && (
-            <div className="flex items-center justify-center py-2 text-sm text-muted-foreground italic">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Đang thực hiện gia hạn...
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Số tháng gia hạn</Label>
+              <Input 
+                type="number" 
+                min={1} 
+                value={renewalMonths} 
+                onChange={e => setRenewalMonths(Number(e.target.value))} 
+                placeholder="Nhập số tháng..."
+              />
             </div>
-          )}
-
+          </div>
+            
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRenewingContract(null)}>Đóng</Button>
+            <Button 
+              className="bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end hover:opacity-90 text-primary-foreground font-semibold"
+              disabled={isRenewing || !renewalMonths || renewalMonths <= 0}
+              onClick={() => handleRenew(renewalMonths)}
+            >
+              {isRenewing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Xác nhận gia hạn
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Terminate Modal */}
+      <Dialog open={!!terminatingContract} onOpenChange={(open) => !open && setTerminatingContract(null)}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Thanh lý hợp đồng</DialogTitle>
+            <DialogDescription>
+              Tiến hành thanh lý và tất toán tiền cọc cho phòng {terminatingContract?.room.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Ngày trả phòng thực tế</Label>
+              <Input type="date" value={terminateDate} onChange={e => setTerminateDate(e.target.value)} />
+            </div>
+            
+            <div className="bg-muted p-3 rounded-md text-sm border flex justify-between">
+              <span className="font-medium">Tiền cọc ban đầu:</span>
+              <span className="font-semibold">{formatCurrency(terminatingContract?.deposit_amount || 0)}</span>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Truy thu tiền nhà tháng cuối (VND)</Label>
+              <Input 
+                type="text" 
+                placeholder="Nhập nếu khách còn nợ tiền nhà"
+                value={terminateLastMonthRent} 
+                onChange={e => setTerminateLastMonthRent(formatCurrencyInput(e.target.value))} 
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Phí khấu trừ / Hư hỏng (VND)</Label>
+              <Input 
+                type="text" 
+                placeholder="Trừ tiền hư hỏng đồ đạc, dọn dẹp..."
+                value={terminateDamageFees} 
+                onChange={e => setTerminateDamageFees(formatCurrencyInput(e.target.value))} 
+              />
+            </div>
+
+            <div className="bg-primary/10 p-3 rounded-md text-sm border border-primary/20 flex justify-between">
+              <span className="font-medium text-primary">Tiền hoàn cọc dự kiến:</span>
+              <span className="font-bold text-primary">
+                {formatCurrency((
+                  (terminatingContract?.deposit_amount || 0) - 
+                  Number(terminateLastMonthRent.replace(/\D/g, "") || 0) - 
+                  Number(terminateDamageFees.replace(/\D/g, "") || 0)
+                ))}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ghi chú thêm</Label>
+              <Input 
+                placeholder="Lý do trả phòng..."
+                value={terminateNotes} 
+                onChange={e => setTerminateNotes(e.target.value)} 
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 pt-4">
+            <Button variant="outline" onClick={() => setTerminatingContract(null)}>Hủy</Button>
+            <Button variant="destructive" onClick={handleTerminate} disabled={isTerminating}>
+              {isTerminating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Xác nhận trả phòng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Footer Add Button */}
+      {["ADMIN", "MANAGER"].includes(userRole) && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm border-t border-border/50 md:static md:bg-transparent md:backdrop-blur-none md:border-t-0 md:p-0 md:pt-4 md:mt-auto z-10">
+          <Button 
+            onClick={handleAddClick} 
+            className="w-full shadow-md rounded-xl h-12 text-base font-semibold bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end hover:opacity-90 transition-opacity max-w-5xl mx-auto flex"
+          >
+            <Plus className="mr-2 h-5 w-5" />
+            Tạo hợp đồng mới
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

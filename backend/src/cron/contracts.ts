@@ -35,7 +35,7 @@ export const syncExpiredContracts = async () => {
 
     for (const contract of expiredContracts) {
       // Check for auto-renewal
-      if (contract.auto_renew_months) {
+      if (contract.auto_renew_months && !contract.is_moving_out) {
         const oldEndDate = contract.end_date;
         const date = new Date(contract.end_date);
         

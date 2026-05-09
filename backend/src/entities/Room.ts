@@ -12,6 +12,7 @@ export enum RoomStatus {
   EMPTY = "EMPTY",
   DEPOSITED = "DEPOSITED",
   OCCUPIED = "OCCUPIED",
+  VACATING_SOON = "VACATING_SOON",
 }
 
 @Entity("rooms")

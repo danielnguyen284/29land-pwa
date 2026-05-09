@@ -33,7 +33,7 @@ interface Building {
 interface Room {
   id: string;
   name: string;
-  status: "EMPTY" | "DEPOSITED" | "OCCUPIED";
+  status: "EMPTY" | "DEPOSITED" | "OCCUPIED" | "VACATING_SOON";
   base_rent: number;
   floor: { name: string; building_id: string };
   room_class?: { name: string };
@@ -110,6 +110,8 @@ export default function RoomsPage() {
         return <span className="text-xs font-medium bg-yellow-100 text-yellow-700 px-2 py-1 rounded-md">Đã cọc</span>;
       case "OCCUPIED":
         return <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md">Đang thuê</span>;
+      case "VACATING_SOON":
+        return <span className="text-xs font-medium bg-orange-100 text-orange-700 px-2 py-1 rounded-md">Sắp trống</span>;
       default:
         return null;
     }
@@ -177,6 +179,13 @@ export default function RoomsPage() {
         >
           Đang thuê
         </Button>
+        <Button 
+          variant={filterStatus === "VACATING_SOON" ? "default" : "outline"} 
+          className={`rounded-xl whitespace-nowrap px-4 ${filterStatus === "VACATING_SOON" ? "bg-gradient-to-r from-primary-gradient-start to-primary-gradient-end text-primary-foreground" : "bg-background"}`}
+          onClick={() => { setFilterStatus("VACATING_SOON"); setPage(1); }}
+        >
+          Sắp trống
+        </Button>
       </div>
 
       {/* Room List */}
@@ -227,13 +236,13 @@ export default function RoomsPage() {
                     <span className="truncate">Ký hợp đồng</span>
                   </Button>
                 )}
-                {room.status === "OCCUPIED" && (
+                {(room.status === "OCCUPIED" || room.status === "VACATING_SOON") && (
                   <Button 
                     variant="secondary" 
                     className="w-full mt-auto opacity-50 cursor-not-allowed px-2" 
                     disabled
                   >
-                    <span className="truncate">Đang thuê</span>
+                    <span className="truncate">{room.status === "OCCUPIED" ? "Đang thuê" : "Sắp trống"}</span>
                   </Button>
                 )}
               </CardContent>

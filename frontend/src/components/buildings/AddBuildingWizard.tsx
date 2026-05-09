@@ -61,6 +61,8 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
   const [buildingType, setBuildingType] = useState<string>("Nhà trọ");
   const [description, setDescription] = useState("");
   const [paymentQrCode, setPaymentQrCode] = useState("");
+  const [leaseStartDate, setLeaseStartDate] = useState("");
+  const [leaseTermYears, setLeaseTermYears] = useState("");
 
   const [fees, setFees] = useState<any[]>([
     { id: "dien", name: "Điện", type: "CONSUMPTION", unit_price: "" },
@@ -112,6 +114,8 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
       setPaymentDeadlineDate("");
       setBuildingType("Nhà trọ");
       setDescription("");
+      setLeaseStartDate("");
+      setLeaseTermYears("");
       setFees([
         { id: "dien", name: "Điện", type: "CONSUMPTION", unit_price: "" },
         { id: "nuoc", name: "Nước", type: "CONSUMPTION", unit_price: "" },
@@ -396,7 +400,9 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
           floors: generatedFloors,
           owner_id: ownerId || undefined,
           manager_ids: managerIds,
-          payment_qr_code: paymentQrCode || undefined
+          payment_qr_code: paymentQrCode || undefined,
+          lease_start_date: leaseStartDate || undefined,
+          lease_term_years: leaseTermYears ? parseInt(leaseTermYears) : undefined
         }),
       });
       alert("Tạo tòa nhà mới thành công!");
@@ -632,7 +638,30 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
                         )}
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">Quản lý có thể xem và thực hiện các thao tác trên tòa nhà này.</p>
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-4 border-t border-dashed">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-normal text-foreground">Ngày bắt đầu thầu</Label>
+                      <Input 
+                        type="date"
+                        value={leaseStartDate} 
+                        onChange={e => setLeaseStartDate(e.target.value)}
+                        className="h-12 bg-background border-border shadow-sm rounded-xl focus-visible:ring-primary/20"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-normal text-foreground">Thời hạn thầu (năm)</Label>
+                      <Input 
+                        type="number"
+                        min={1}
+                        value={leaseTermYears} 
+                        onChange={e => setLeaseTermYears(e.target.value)}
+                        className="h-12 bg-background border-border shadow-sm rounded-xl focus-visible:ring-primary/20"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -740,6 +769,8 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
                       className="w-full min-h-[100px] p-3 text-sm bg-background border border-border shadow-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
+
+
 
                   <div className="space-y-2">
                     <Label className="text-sm font-normal text-foreground">Mã QR Thanh toán chung</Label>

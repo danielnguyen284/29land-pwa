@@ -1,16 +1,29 @@
 "use client";
 
+import { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { toJpeg } from "html-to-image";
-import { AlertCircle, CheckCircle, Image as ImageIcon, Loader2, Save } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { 
+  Plus, 
+  Trash2, 
+  Edit2, 
+  CheckCircle, 
+  AlertCircle, 
+  Loader2, 
+  ImageIcon, 
+  Save 
+} from "lucide-react";
+
 interface Building {
   id: string;
   name: string;
@@ -65,6 +78,20 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [isSaving, setIsSaving] = useState(false);
   
   const [paymentAmount, setPaymentAmount] = useState<string>("");
+  
+  // Edit states
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingRent, setEditingRent] = useState("");
+  const [editingRollingBalance, setEditingRollingBalance] = useState("");
+  const [editingItems, setEditingItems] = useState<any[]>([]);
+  const [userRole, setUserRole] = useState("");
+
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      setUserRole(JSON.parse(userStr).role);
+    }
+  }, []);
 
   useEffect(() => {
     fetchInvoice();
@@ -100,6 +127,45 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSaveInvoice = async () => {
+    if (!invoice) return;
+    setIsSaving(true);
+    try {
+      const res = await apiFetch<InvoiceDetail>(`/api/invoices/${invoice.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          rent_amount: parseFloat(editingRent),
+          rolling_balance: parseFloat(editingRollingBalance),
+          items: editingItems.map(it => ({
+            description: it.description,
+            amount: parseFloat(it.amount.toString())
+          }))
+        })
+      });
+      toast.success("Đã cập nhật hóa đơn");
+      setIsEditDialogOpen(false);
+      fetchInvoice();
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi khi cập nhật hóa đơn");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const addEditingItem = () => {
+    setEditingItems([...editingItems, { description: "", amount: 0 }]);
+  };
+
+  const removeEditingItem = (index: number) => {
+    setEditingItems(editingItems.filter((_, i) => i !== index));
+  };
+
+  const updateEditingItem = (index: number, field: string, value: any) => {
+    const newItems = [...editingItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setEditingItems(newItems);
   };
 
   const handleDownloadImage = async () => {
@@ -157,6 +223,47 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const SORT_ORDER = [
+    "phòng",
+    "điện",
+    "nước",
+    "internet", "mạng", "wifi",
+    "dịch vụ",
+    "giặt"
+  ];
+
+  const getSortPriority = (description: string) => {
+    const desc = description.toLowerCase();
+    for (let i = 0; i < SORT_ORDER.length; i++) {
+      if (desc.includes(SORT_ORDER[i])) return i;
+    }
+    return 999; // Default for unknown items
+  };
+
+  const cleanDescription = (desc: string) => {
+    if (desc.includes(":") && (desc.includes("→") || desc.includes("->"))) {
+      return desc.split(":")[0].trim();
+    }
+    return desc;
+  };
+
+  const getSortedItems = (items: any[] | undefined, rentAmount: string) => {
+    const allItems = (items || []).map(it => ({
+      ...it,
+      description: cleanDescription(it.description)
+    }));
+    
+    // Check if "Tiền phòng" is already in items
+    const hasRentInItems = allItems.some(it => it.description.toLowerCase().includes("phòng"));
+    
+    const displayItems = [...allItems];
+    if (!hasRentInItems && Number(rentAmount) > 0) {
+      displayItems.push({ id: 'base-rent', description: "Tiền phòng", amount: rentAmount });
+    }
+
+    return displayItems.sort((a, b) => getSortPriority(a.description) - getSortPriority(b.description));
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
@@ -173,7 +280,25 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="space-y-6 pb-20 md:pb-0 max-w-4xl mx-auto">
-      <div className="flex justify-end print:hidden">
+      <div className="flex justify-end gap-2 print:hidden">
+        {["ADMIN", "MANAGER"].includes(userRole) && (
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setEditingRent(invoice.rent_amount);
+              setEditingRollingBalance(invoice.rolling_balance);
+              setEditingItems(
+                (invoice.items || [])
+                  .filter(it => !it.description.toLowerCase().includes("phòng"))
+                  .map(it => ({ ...it, description: cleanDescription(it.description) }))
+              );
+              setIsEditDialogOpen(true);
+            }}
+          >
+            <Edit2 className="mr-2 h-4 w-4" />
+            Sửa nội dung
+          </Button>
+        )}
         <Button variant="outline" onClick={handleDownloadImage}>
           <ImageIcon className="mr-2 h-4 w-4" />
           Tải ảnh hóa đơn
@@ -222,7 +347,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoice.items?.map((item, index) => (
+                {getSortedItems(invoice.items, invoice.rent_amount).map((item, index) => (
                   <TableRow key={item.id || index}>
                     <TableCell className="font-medium whitespace-pre-wrap">{item.description}</TableCell>
                     <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
@@ -360,7 +485,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {invoice.items?.map((item, index) => (
+                  {getSortedItems(invoice.items, invoice.rent_amount).map((item, index) => (
                     <tr key={index}>
                       <td className="px-6 py-4 text-slate-700 whitespace-pre-wrap">{item.description}</td>
                       <td className="px-6 py-4 text-right font-medium text-slate-900">{formatCurrency(item.amount)}</td>
@@ -427,6 +552,102 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </div>
+      {/* Edit Invoice Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa nội dung hóa đơn</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tiền phòng (VND)</Label>
+                <Input 
+                  type="number" 
+                  value={editingRent} 
+                  onChange={e => setEditingRent(e.target.value)} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Nợ tháng trước (VND)</Label>
+                <Input 
+                  type="number" 
+                  value={editingRollingBalance} 
+                  onChange={e => setEditingRollingBalance(e.target.value)} 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">Các mục thu bổ sung</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addEditingItem}>
+                  <Plus className="h-4 w-4 mr-1" /> Thêm mục
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {editingItems.map((item, index) => (
+                  <div key={index} className="flex gap-3 items-start bg-muted/30 p-3 rounded-lg border group">
+                    <div className="flex-1 space-y-3">
+                      <Input 
+                        placeholder="Mô tả (ví dụ: Tiền điện, Tiền nước...)" 
+                        value={item.description}
+                        onChange={e => updateEditingItem(index, "description", e.target.value)}
+                        className="bg-background"
+                      />
+                      <Input 
+                        type="number" 
+                        placeholder="Số tiền" 
+                        value={item.amount}
+                        onChange={e => updateEditingItem(index, "amount", e.target.value)}
+                        className="bg-background"
+                      />
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removeEditingItem(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {editingItems.length === 0 && (
+                  <p className="text-center text-muted-foreground py-4 border-2 border-dashed rounded-lg">
+                    Chưa có mục thu bổ sung nào
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t">
+              <div className="flex justify-between items-center text-lg font-bold">
+                <span>Tổng tiền sau thay đổi:</span>
+                <span className="text-primary text-xl">
+                  {formatCurrency(
+                    Number(editingRent || 0) + 
+                    Number(editingRollingBalance || 0) + 
+                    editingItems.reduce((sum, it) => sum + Number(it.amount || 0), 0)
+                  )}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 italic text-right">
+                * Trạng thái hóa đơn sẽ tự động cập nhật dựa trên số tiền đã thanh toán ({formatCurrency(invoice.paid_amount)})
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleSaveInvoice} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu thay đổi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

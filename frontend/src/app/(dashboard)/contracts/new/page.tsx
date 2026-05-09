@@ -13,7 +13,8 @@ import {
   Download,
   Loader2,
   Upload,
-  X
+  X,
+  ChevronLeft
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -67,17 +68,25 @@ function NewContractForm() {
   const [formEndDate, setFormEndDate] = useState("");
   const [formAutoRenew, setFormAutoRenew] = useState(false);
   const [formAutoRenewMonths, setFormAutoRenewMonths] = useState<number>(6);
+  const [durationMonths, setDurationMonths] = useState<string>("");
 
-  const setDuration = (months: number) => {
+  const setDuration = (months: number | string) => {
+    const m = Number(months);
+    if (!m || m <= 0) {
+      setDurationMonths(months.toString());
+      return;
+    }
+    
     if (!formStartDate) {
       toast.error("Vui lòng chọn ngày bắt đầu trước");
       return;
     }
     const start = new Date(formStartDate);
-    const targetDate = addMonths(start, months);
+    const targetDate = addMonths(start, m);
     const finalEnd = endOfMonth(subDays(targetDate, 1));
     setFormEndDate(format(finalEnd, "yyyy-MM-dd"));
-    setFormAutoRenewMonths(months);
+    setDurationMonths(m.toString());
+    setFormAutoRenewMonths(m);
   };
   const [formRent, setFormRent] = useState("");
   const [formDeposit, setFormDeposit] = useState("");
@@ -276,6 +285,18 @@ function NewContractForm() {
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
+      <div className="flex items-center gap-3 mb-2">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => router.back()}
+          className="rounded-full h-10 w-10 shrink-0"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </Button>
+        <h1 className="text-xl font-bold">Tạo hợp đồng</h1>
+      </div>
+
       <div className="flex-1 w-full max-w-3xl mx-auto">
         <form onSubmit={handleSave} className="space-y-6">
           
@@ -393,17 +414,25 @@ function NewContractForm() {
                 <Label>Ngày bắt đầu <span className="text-destructive">*</span></Label>
                 <Input type="date" value={formStartDate} onChange={e => setFormStartDate(e.target.value)} required />
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label>Ngày kết thúc <span className="text-destructive">*</span></Label>
-                  <div className="flex gap-1">
-                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(3)}>3T</Button>
-                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(6)}>6T</Button>
-                    <Button type="button" variant="outline" size="xs" className="h-6 px-2 text-[10px]" onClick={() => setDuration(12)}>12T</Button>
+                <div className="flex gap-2">
+                  <div className="flex-1 space-y-1">
+                    <div className="flex justify-between items-center h-6 mb-1">
+                      <Label className="text-[10px] text-muted-foreground uppercase">Số tháng</Label>
+                    </div>
+                    <Input 
+                      type="number" 
+                      placeholder="Nhập số tháng..." 
+                      value={durationMonths} 
+                      onChange={e => setDuration(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-[1.5] space-y-1">
+                    <div className="h-6 mb-1 flex items-center">
+                      <Label className="text-[10px] text-muted-foreground uppercase">Ngày kết thúc</Label>
+                    </div>
+                    <Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} required />
                   </div>
                 </div>
-                <Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} required />
-              </div>
               <div className="space-y-2">
                 <Label>Tiền phòng (VND)</Label>
                 <Input type="text" value={formatCurrency(formRent)} onChange={e => setFormRent(e.target.value.replace(/\D/g, ""))} />
@@ -431,19 +460,15 @@ function NewContractForm() {
               </div>
 
               {formAutoRenew && (
-                <div className="flex gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {[3, 6, 9, 12].map((m) => (
-                    <Button
-                      key={m}
-                      type="button"
-                      variant={formAutoRenewMonths === m ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1 rounded-xl"
-                      onClick={() => setFormAutoRenewMonths(m)}
-                    >
-                      {m} tháng
-                    </Button>
-                  ))}
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <Label className="text-xs">Số tháng gia hạn mỗi chu kỳ</Label>
+                  <Input 
+                    type="number" 
+                    min={1} 
+                    value={formAutoRenewMonths} 
+                    onChange={e => setFormAutoRenewMonths(Number(e.target.value))} 
+                    className="max-w-[150px]"
+                  />
                 </div>
               )}
             </div>

@@ -15,6 +15,7 @@ import billingRoutes from "./routes/billing";
 import contractRoutes from "./routes/contracts";
 import uploadRoutes from "./routes/upload";
 import notificationRoutes from "./routes/notifications";
+import transactionRoutes from "./routes/transactions";
 import { IsNull } from "typeorm";
 import { Tenant } from "./entities/Tenant";
 import { Contract } from "./entities/Contract";
@@ -47,6 +48,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/contracts", contractRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/transactions", transactionRoutes);
 
 // Bootstrap
 AppDataSource.initialize()

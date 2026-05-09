@@ -64,6 +64,8 @@ interface Building {
   owner_id?: string;
   manager_ids?: string[];
   payment_qr_code?: string;
+  lease_start_date?: string;
+  lease_term_years?: number;
 }
 
 interface Floor {
@@ -80,7 +82,7 @@ interface RoomClass {
 interface Room {
   id: string;
   name: string;
-  status: "EMPTY" | "DEPOSITED" | "OCCUPIED";
+  status: "EMPTY" | "DEPOSITED" | "OCCUPIED" | "VACATING_SOON";
   base_rent: number;
   area?: number;
   floor: Floor;
@@ -264,7 +266,9 @@ export default function BuildingDetailPage() {
         description: building.description || "",
         owner_id: building.owner?.id || undefined,
         manager_ids: building.managers?.map(m => m.id) || [],
-        payment_qr_code: building.payment_qr_code || undefined
+        payment_qr_code: building.payment_qr_code || undefined,
+        lease_start_date: building.lease_start_date || "",
+        lease_term_years: building.lease_term_years || undefined
       });
       setIsEditingBasic(true);
     }
@@ -450,6 +454,30 @@ export default function BuildingDetailPage() {
     ...floor,
     rooms: rooms.filter(r => r.floor.id === floor.id)
   }));
+
+  const getRemainingLeaseTime = (startDate?: string, termYears?: number) => {
+    if (!startDate || !termYears) return null;
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setFullYear(start.getFullYear() + termYears);
+    
+    const now = new Date();
+    const diff = end.getTime() - now.getTime();
+    
+    if (diff <= 0) return "Đã hết hạn thầu";
+    
+    const totalDays = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const years = Math.floor(totalDays / 365);
+    const months = Math.floor((totalDays % 365) / 30);
+    const days = totalDays % 30;
+    
+    let result = "";
+    if (years > 0) result += `${years} năm `;
+    if (months > 0) result += `${months} tháng `;
+    if (days > 0 && years === 0) result += `${days} ngày`;
+    
+    return result.trim() || "Sắp hết hạn";
+  };
 
   if (editingRoom) {
     return (
@@ -831,6 +859,26 @@ export default function BuildingDetailPage() {
                       />
                     </div>
                   </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Ngày bắt đầu thầu</Label>
+                      <Input 
+                        type="date"
+                        value={editBuilding.lease_start_date || ""} 
+                        onChange={e => setEditBuilding({...editBuilding, lease_start_date: e.target.value})} 
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Thời hạn thầu (năm)</Label>
+                      <Input 
+                        type="number"
+                        value={editBuilding.lease_term_years || ""} 
+                        onChange={e => setEditBuilding({...editBuilding, lease_term_years: parseInt(e.target.value)})} 
+                        className="bg-background"
+                      />
+                    </div>
+                  </div>
                   <div className="grid gap-2">
                     <Label>Mô tả thêm</Label>
                     <textarea 
@@ -983,6 +1031,33 @@ export default function BuildingDetailPage() {
                       <p>Chưa gán</p>
                     )}
                   </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground font-medium">Ngày bắt đầu thầu</p>
+                    <p>{building.lease_start_date ? new Date(building.lease_start_date).toLocaleDateString("vi-VN") : "Chưa cập nhật"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground font-medium">Thời hạn thầu</p>
+                    <p>{building.lease_term_years ? `${building.lease_term_years} năm` : "Chưa cập nhật"}</p>
+                  </div>
+                  {building.lease_start_date && building.lease_term_years && (
+                    <div className="space-y-1 md:col-span-2 p-3 bg-orange-50 border border-orange-100 rounded-xl mt-2">
+                      <p className="text-orange-800 font-semibold flex items-center gap-2 text-xs uppercase tracking-wider">
+                        Thời hạn thầu còn lại
+                      </p>
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <span className="font-bold text-xl text-orange-600">
+                          {getRemainingLeaseTime(building.lease_start_date, building.lease_term_years)}
+                        </span>
+                        <span className="text-xs text-orange-700/70 font-medium">
+                          Hết hạn: {(() => {
+                            const d = new Date(building.lease_start_date);
+                            d.setFullYear(d.getFullYear() + building.lease_term_years);
+                            return d.toLocaleDateString("vi-VN");
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   {building.payment_qr_code ? (
                     <div className="space-y-1 md:col-span-2">
                       <p className="text-muted-foreground font-medium">Mã QR Thanh toán (Của tòa nhà)</p>
@@ -1262,11 +1337,18 @@ export default function BuildingDetailPage() {
                         }}
                         className={`bg-background p-3 rounded-xl border border-border shadow-sm hover:shadow-md transition-all relative group ${currentUserRole !== "MANAGER" ? "cursor-pointer" : ""}`}
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <p className="font-medium">{room.name}</p>
-                          {currentUserRole !== "MANAGER" && (
-                            <Pencil className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
-                          )}
+                        <div className="flex justify-between items-start mb-1">
+                          <p className="font-medium truncate mr-1">{room.name}</p>
+                          <Badge variant="outline" className={`text-[9px] px-1 h-4 shrink-0 font-normal ${
+                            room.status === "EMPTY" ? "text-red-600 border-red-200 bg-red-50" :
+                            room.status === "DEPOSITED" ? "text-yellow-700 border-yellow-200 bg-yellow-50" :
+                            room.status === "VACATING_SOON" ? "text-orange-700 border-orange-200 bg-orange-50" :
+                            "text-emerald-700 border-emerald-200 bg-emerald-50"
+                          }`}>
+                            {room.status === "EMPTY" ? "Trống" :
+                             room.status === "DEPOSITED" ? "Đã cọc" :
+                             room.status === "VACATING_SOON" ? "Sắp trống" : "Ở"}
+                          </Badge>
                         </div>
                         <p className="text-sm font-semibold text-emerald-700">{formatCurrency(room.base_rent)}</p>
                         <div className="mt-2 text-xs text-muted-foreground flex justify-between items-center">

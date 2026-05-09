@@ -11,6 +11,8 @@ import { Building } from "../entities/Building";
 import { authenticate, requireRole, AuthRequest } from "../middlewares/auth";
 import { UserRole } from "../entities/User";
 import { In } from "typeorm";
+import { Transaction } from "../entities/Transaction";
+import { TransactionType } from "../entities/TransactionCategory";
 
 const router = Router();
 const roomRepo = () => AppDataSource.getRepository(Room);
@@ -21,6 +23,7 @@ const tenantRepo = () => AppDataSource.getRepository(Tenant);
 const contractRepo = () => AppDataSource.getRepository(Contract);
 const managerRepo = () => AppDataSource.getRepository(BuildingManager);
 const buildingRepo = () => AppDataSource.getRepository(Building);
+const transactionRepo = () => AppDataSource.getRepository(Transaction);
 
 router.use(authenticate);
 
@@ -151,7 +154,23 @@ router.get("/dashboard", requireRole(UserRole.ADMIN, UserRole.OWNER, UserRole.MA
       }
     }
 
-    // 4. Maintenance Tickets (Created in the period)
+    // 4. Other Transactions (Income/Expense)
+    const transactions = await transactionRepo()
+      .createQueryBuilder("tr")
+      .where("tr.building_id IN (:...buildingIds)", { buildingIds })
+      .andWhere("tr.accounting_period = :period", { period: targetPeriod })
+      .getMany();
+
+    for (const tr of transactions) {
+      if (tr.type === TransactionType.EXPENSE) {
+        totalExpenses += Number(tr.amount);
+      } else if (tr.type === TransactionType.INCOME) {
+        expectedRevenue += Number(tr.amount);
+        collectedRevenue += Number(tr.amount);
+      }
+    }
+
+    // 5. Maintenance Tickets (Created in the period)
     const tickets = await ticketRepo()
       .createQueryBuilder("t")
       .innerJoin("t.room", "r")
@@ -163,11 +182,10 @@ router.get("/dashboard", requireRole(UserRole.ADMIN, UserRole.OWNER, UserRole.MA
     const ticketsSummary = {
       total: tickets.length,
       pending: tickets.filter(t => t.status === "PENDING").length,
-      in_progress: tickets.filter(t => t.status === "IN_PROGRESS").length,
       completed: tickets.filter(t => t.status === "COMPLETED").length,
     };
 
-    // 5. Tenants
+    // 6. Tenants
     const tenants = await tenantRepo()
       .createQueryBuilder("t")
       .innerJoin("t.room", "r")
@@ -176,7 +194,7 @@ router.get("/dashboard", requireRole(UserRole.ADMIN, UserRole.OWNER, UserRole.MA
       .andWhere("t.status = :status", { status: "ACTIVE" })
       .getCount();
 
-    // 6. Contracts
+    // 7. Contracts
     const contracts = await contractRepo()
       .createQueryBuilder("c")
       .innerJoin("c.room", "r")
@@ -262,6 +280,8 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
     let depositsRevenue = 0;
     let refundExpenses = 0;
     let maintenanceExpenses = 0;
+    let otherIncome = 0;
+    let otherExpense = 0;
 
     // Generate month buckets between start and end
     const chartDataMap = new Map<string, { period: string; revenue: number; expense: number; profit: number }>();
@@ -358,6 +378,32 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
       }
     });
 
+    // 5. Other Transactions (Thu chi)
+    const transactionStartPeriod = start.toISOString().substring(0, 7);
+    const transactionEndPeriod = endDateObj.toISOString().substring(0, 7);
+    
+    const transactions = await transactionRepo()
+      .createQueryBuilder("tr")
+      .where("tr.building_id IN (:...buildingIds)", { buildingIds: targetBuildingIds })
+      .andWhere("tr.accounting_period >= :startPeriod AND tr.accounting_period <= :endPeriod", { 
+        startPeriod: transactionStartPeriod, 
+        endPeriod: transactionEndPeriod 
+      })
+      .getMany();
+
+    transactions.forEach(tr => {
+      const bucket = chartDataMap.get(tr.accounting_period);
+      if (bucket) {
+        if (tr.type === TransactionType.INCOME) {
+          bucket.revenue += Number(tr.amount);
+          otherIncome += Number(tr.amount);
+        } else {
+          bucket.expense += Number(tr.amount);
+          otherExpense += Number(tr.amount);
+        }
+      }
+    });
+
     // Calculate totals and profits
     let totalRevenue = 0;
     let totalExpense = 0;
@@ -400,7 +446,9 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
         invoicesRevenue,
         depositsRevenue,
         refundExpenses,
-        maintenanceExpenses
+        maintenanceExpenses,
+        otherIncome,
+        otherExpense
       },
       chartData
     });

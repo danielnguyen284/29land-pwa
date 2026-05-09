@@ -71,6 +71,9 @@ export class Contract {
   @Column({ type: "int", nullable: true })
   auto_renew_months!: number | null;
 
+  @Column({ type: "boolean", default: false })
+  is_moving_out!: boolean;
+
   @CreateDateColumn()
   created_at!: Date;
 

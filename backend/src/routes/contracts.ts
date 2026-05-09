@@ -4,12 +4,14 @@ import { Contract } from "../entities/Contract";
 import { Building } from "../entities/Building";
 import { BuildingManager } from "../entities/BuildingManager";
 import { UserRole } from "../entities/User";
+import { Room, RoomStatus } from "../entities/Room";
 import { authenticate, AuthRequest } from "../middlewares/auth";
 
 const router = Router();
 const contractRepo = () => AppDataSource.getRepository(Contract);
 const buildingRepo = () => AppDataSource.getRepository(Building);
 const managerRepo = () => AppDataSource.getRepository(BuildingManager);
+const roomRepo = () => AppDataSource.getRepository(Room);
 
 router.use(authenticate);
 
@@ -114,6 +116,50 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
     res.json(contract);
   } catch (error) {
     console.error("Get contract error:", error);
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+});
+
+// PATCH /api/contracts/:id/notice-to-move — Toggle move out notice
+router.patch("/:id/notice-to-move", async (req: AuthRequest, res: Response) => {
+  try {
+    const { is_moving_out } = req.body;
+    const contractId = req.params.id as string;
+
+    const contract = await contractRepo().findOne({
+      where: { id: contractId as string },
+      relations: ["room", "room.floor"]
+    });
+
+    if (!contract) {
+      return res.status(404).json({ message: "Không tìm thấy hợp đồng" });
+    }
+
+    // RBAC check
+    const { role, id: userId } = req.user!;
+    const buildingId = contract.room.floor.building_id;
+
+    if (role === UserRole.OWNER) {
+      const building = await buildingRepo().findOne({ where: { id: buildingId, owner_id: userId } });
+      if (!building) return res.status(403).json({ message: "Không có quyền" });
+    } else if (role === UserRole.MANAGER) {
+      const assignment = await managerRepo().findOne({ where: { manager_id: userId, building_id: buildingId } });
+      if (!assignment) return res.status(403).json({ message: "Không có quyền" });
+    }
+
+    // Update contract
+    contract.is_moving_out = is_moving_out;
+    await contractRepo().save(contract);
+
+    // Update room status
+    // If is_moving_out is true, status = VACATING_SOON
+    // If is_moving_out is false, status = OCCUPIED
+    const newRoomStatus = is_moving_out ? RoomStatus.VACATING_SOON : RoomStatus.OCCUPIED;
+    await roomRepo().update(contract.room_id, { status: newRoomStatus });
+
+    res.json({ message: "Cập nhật thành công", is_moving_out, room_status: newRoomStatus });
+  } catch (error) {
+    console.error("Toggle notice error:", error);
     res.status(500).json({ message: "Lỗi hệ thống" });
   }
 });
