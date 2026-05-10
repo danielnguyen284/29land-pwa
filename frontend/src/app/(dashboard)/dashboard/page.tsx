@@ -41,7 +41,6 @@ interface DashboardData {
   tickets: {
     total: number;
     pending: number;
-    in_progress: number;
     completed: number;
   };
   tenants: {

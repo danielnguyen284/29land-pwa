@@ -174,7 +174,6 @@ router.patch("/:id", requireTicketAccess, async (req: AuthRequest, res: Response
 
     if (assigned_tech_id !== undefined) {
       ticket!.assigned_tech_id = assigned_tech_id;
-      // No longer automatically changing to IN_PROGRESS as it's removed. 
       // Ticket remains PENDING until it goes to WAITING_APPROVAL or COMPLETED.
       if (assigned_tech_id) {
         await createNotification(

@@ -116,7 +116,7 @@ erDiagram
         uuid assigned_tech_id FK "Nullable"
         string title
         text description
-        string status "PENDING, IN_PROGRESS, NEEDS_EXPLANATION, COMPLETED, OVERDUE"
+        string status "PENDING, WAITING_APPROVAL, COMPLETED, OVERDUE"
         datetime created_at
     }
 
@@ -175,4 +175,4 @@ erDiagram
 
 ### Maintenance & Ticketing
 - **`TICKETS`**: Managed primarily by Manager and assigned to Technician. Tracks the lifecycle of the maintenance task.
-- **`TICKET_EXPENSES`**: Separated from the ticket itself so that a single ticket can have multiple expense claims (materials bought). If an expense is `REJECTED` by the Owner, the parent ticket state shifts to `NEEDS_EXPLANATION`.
+- **`TICKET_EXPENSES`**: Separated from the ticket itself so that a single ticket can have multiple expense claims (materials bought). If an expense is `REJECTED` by the Owner, the Manager must mediate.

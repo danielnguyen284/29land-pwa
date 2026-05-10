@@ -62,8 +62,8 @@ export const requireTicketAccess = async (req: AuthRequest, res: Response, next:
   // Owner access
   if (req.user.role === UserRole.OWNER) {
     if (ticket.building?.owner_id === req.user.id) {
-      // Owners only see tickets that are WAITING_APPROVAL, COMPLETED or NEEDS_EXPLANATION
-      const visibleStatuses = ["WAITING_APPROVAL", "COMPLETED", "NEEDS_EXPLANATION"];
+      // Owners only see tickets that are WAITING_APPROVAL or COMPLETED
+      const visibleStatuses = ["WAITING_APPROVAL", "COMPLETED"];
       if (visibleStatuses.includes(ticket.status)) return next();
       return res.status(403).json({ message: "Phiếu này chưa được gửi cho bạn" });
     }
@@ -110,8 +110,8 @@ export const requireExpenseAccess = async (req: AuthRequest, res: Response, next
   // Owner access
   if (req.user.role === UserRole.OWNER) {
     if (ticket.building?.owner_id === req.user.id) {
-      // Owners only see expenses of tickets that are WAITING_APPROVAL, COMPLETED or NEEDS_EXPLANATION
-      const visibleStatuses = ["WAITING_APPROVAL", "COMPLETED", "NEEDS_EXPLANATION"];
+      // Owners only see expenses of tickets that are WAITING_APPROVAL or COMPLETED
+      const visibleStatuses = ["WAITING_APPROVAL", "COMPLETED"];
       if (visibleStatuses.includes(ticket.status)) return next();
       return res.status(403).json({ message: "Khoản chi này chưa được gửi cho bạn" });
     }

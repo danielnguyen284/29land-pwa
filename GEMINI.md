@@ -45,8 +45,8 @@
 
 ### 4.3 Ticketing System (Maintenance)
 - **Workflow:** Manager Create -> Push Notification -> Technician Accept -> Progress Update -> Completion Report (with Receipt Photos/Costs for claims).
-- **Approval Flow:** If Owner rejects a claim, status changes to "Needs Explanation". Manager mediates between Owner and Technician.
-- **Status Tracking:** Pending, In Progress, Needs Explanation, Completed, Overdue.
+- **Approval Flow:** If Owner rejects a claim, Manager mediates between Owner and Technician.
+- **Status Tracking:** Pending, Waiting Approval, Completed, Overdue.
 
 ### 4.4 Contract & Tenant Management
 - **Tenant Data:** Identity (CCCD), Contact, History. 1 Representative per room for billing; others stored for temporary residence registration.

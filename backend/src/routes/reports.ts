@@ -67,7 +67,7 @@ router.get("/dashboard", requireRole(UserRole.ADMIN, UserRole.OWNER, UserRole.MA
         occupancy: { total: 0, occupied: 0, rate: 0 },
         revenue: { expected: 0, collected: 0, outstanding: 0 },
         expenses: { total: 0 },
-        tickets: { total: 0, pending: 0, in_progress: 0, completed: 0 },
+        tickets: { total: 0, pending: 0, completed: 0 },
         tenants: { total: 0 },
         contracts: { total: 0, expiring: 0 }
       });
