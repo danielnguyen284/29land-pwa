@@ -5,6 +5,7 @@ import { Ticket } from "../entities/Ticket";
 import { AppDataSource } from "../data-source";
 import { Building } from "../entities/Building";
 import { BuildingManager } from "../entities/BuildingManager";
+import { BuildingOwner } from "../entities/BuildingOwner";
 
 export const requireBuildingAccess = async (req: AuthRequest, res: Response, next: NextFunction) => {
   if (!req.user) return res.status(401).json({ message: "Unauthorized" });
@@ -18,7 +19,10 @@ export const requireBuildingAccess = async (req: AuthRequest, res: Response, nex
 
   if (req.user.role === UserRole.OWNER) {
     const building = await buildingRepo.findOneBy({ id: buildingId as string });
-    if (!building || building.owner_id !== req.user.id) { 
+    const ownerRepo = AppDataSource.getRepository(BuildingOwner);
+    const ownership = await ownerRepo.findOneBy({ building_id: buildingId as string, owner_id: req.user.id });
+
+    if (!building || (!ownership && building.owner_id !== req.user.id)) { 
       return res.status(403).json({ message: "Không có quyền truy cập tòa nhà này" }); 
     }
     return next();
@@ -61,7 +65,10 @@ export const requireTicketAccess = async (req: AuthRequest, res: Response, next:
 
   // Owner access
   if (req.user.role === UserRole.OWNER) {
-    if (ticket.building?.owner_id === req.user.id) {
+    const ownerRepo = AppDataSource.getRepository(BuildingOwner);
+    const ownership = await ownerRepo.findOneBy({ building_id: ticket.building_id, owner_id: req.user.id });
+
+    if (ownership || ticket.building?.owner_id === req.user.id) {
       // Owners only see tickets that are WAITING_APPROVAL or COMPLETED
       const visibleStatuses = ["WAITING_APPROVAL", "COMPLETED"];
       if (visibleStatuses.includes(ticket.status)) return next();
@@ -109,7 +116,10 @@ export const requireExpenseAccess = async (req: AuthRequest, res: Response, next
 
   // Owner access
   if (req.user.role === UserRole.OWNER) {
-    if (ticket.building?.owner_id === req.user.id) {
+    const ownerRepo = AppDataSource.getRepository(BuildingOwner);
+    const ownership = await ownerRepo.findOneBy({ building_id: ticket.building_id, owner_id: req.user.id });
+
+    if (ownership || ticket.building?.owner_id === req.user.id) {
       // Owners only see expenses of tickets that are WAITING_APPROVAL or COMPLETED
       const visibleStatuses = ["WAITING_APPROVAL", "COMPLETED"];
       if (visibleStatuses.includes(ticket.status)) return next();

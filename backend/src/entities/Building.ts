@@ -14,12 +14,12 @@ export class Building {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
-  owner_id!: string;
+  @Column({ nullable: true })
+  owner_id?: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: "owner_id" })
-  owner!: User;
+  owner?: User;
 
   @Column()
   name!: string;

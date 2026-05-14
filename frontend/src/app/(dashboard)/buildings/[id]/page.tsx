@@ -59,9 +59,9 @@ interface Building {
   invoice_closing_date: number;
   payment_deadline_date?: number;
   fee_configs: FeeConfig[];
-  owner?: { id: string; name: string; phone: string; payment_qr_code?: string };
+  owners?: { id: string; name: string; phone: string; payment_qr_code?: string }[];
   managers?: { id: string; name: string; phone: string }[];
-  owner_id?: string;
+  owner_ids?: string[];
   manager_ids?: string[];
   payment_qr_code?: string;
   lease_start_date?: string;
@@ -109,6 +109,7 @@ export default function BuildingDetailPage() {
   const [isEditingBasic, setIsEditingBasic] = useState(false);
   const [editBuilding, setEditBuilding] = useState<Partial<Building>>({});
 
+  const [ownerSearch, setOwnerSearch] = useState("");
   const [managerSearch, setManagerSearch] = useState("");
 
   // Dialog States
@@ -242,9 +243,12 @@ export default function BuildingDetailPage() {
   }, [isEditingBasic, editBuilding.district, districts]);
 
   const ownersList = usersList.filter(u => u.role === "ADMIN" || u.role === "OWNER");
+  const filteredOwners = ownersList.filter(o => 
+    o.name.toLowerCase().includes(ownerSearch.toLowerCase()) || 
+    (o.phone && o.phone.includes(ownerSearch))
+  );
+
   const managersList = usersList.filter(u => u.role === "MANAGER");
-
-
   const filteredManagers = managersList.filter(m => 
     m.name.toLowerCase().includes(managerSearch.toLowerCase()) || 
     m.phone.includes(managerSearch)
@@ -264,7 +268,7 @@ export default function BuildingDetailPage() {
         invoice_closing_date: building.invoice_closing_date,
         payment_deadline_date: building.payment_deadline_date || 1,
         description: building.description || "",
-        owner_id: building.owner?.id || undefined,
+        owner_ids: building.owners?.map(o => o.id) || [],
         manager_ids: building.managers?.map(m => m.id) || [],
         payment_qr_code: building.payment_qr_code || undefined,
         lease_start_date: building.lease_start_date || "",
@@ -890,20 +894,39 @@ export default function BuildingDetailPage() {
 
                   {/* Chủ nhà */}
                   {currentUserRole === "ADMIN" && (
-                    <div className="grid gap-2 relative">
+                    <div className="grid gap-2">
                       <Label>Chủ nhà</Label>
-                      <SearchableSelect
-                        options={ownersList.map(o => ({
-                          value: o.id,
-                          label: `${o.name} - ${o.phone}`
-                        }))}
-                        value={editBuilding.owner_id || ""}
-                        onValueChange={(v) => setEditBuilding({...editBuilding, owner_id: v})}
-                        placeholder="Chọn chủ nhà"
-                        searchPlaceholder="Tìm chủ nhà (tên, sđt)..."
-                        emptyMessage="Không tìm thấy chủ nhà"
-                        className="bg-background"
-                      />
+                      <div className="bg-background rounded-md border border-border overflow-hidden">
+                        <div className="p-2 border-b border-border bg-muted/50">
+                          <Input 
+                            placeholder="Tìm chủ nhà (tên, sđt)..." 
+                            value={ownerSearch}
+                            onChange={(e) => setOwnerSearch(e.target.value)}
+                            className="h-8 text-sm bg-background"
+                          />
+                        </div>
+                        <div className="p-3 space-y-2 max-h-48 overflow-y-auto">
+                          {filteredOwners.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Chưa có chủ nhà nào phù hợp</p>
+                          ) : (
+                            filteredOwners.map(o => (
+                              <label key={o.id} className="flex items-center space-x-2 p-1 hover:bg-muted rounded cursor-pointer">
+                                <input 
+                                  type="checkbox" 
+                                  checked={(editBuilding.owner_ids || []).includes(o.id)}
+                                  onChange={(e) => {
+                                    const ids = editBuilding.owner_ids || [];
+                                    if (e.target.checked) setEditBuilding({...editBuilding, owner_ids: [...ids, o.id]});
+                                    else setEditBuilding({...editBuilding, owner_ids: ids.filter(id => id !== o.id)});
+                                  }}
+                                  className="rounded border-border text-primary focus:ring-primary w-4 h-4"
+                                />
+                                <span className="text-sm">{o.name} - {o.phone}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1017,7 +1040,15 @@ export default function BuildingDetailPage() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-muted-foreground font-medium">Chủ nhà</p>
-                    <p>{building.owner ? `${building.owner.name} - ${building.owner.phone}` : "Chưa gán"}</p>
+                    {building.owners && building.owners.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {building.owners.map(o => (
+                          <Badge key={o.id} variant="outline" className="text-xs">{o.name}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>Chưa gán</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <p className="text-muted-foreground font-medium">Quản lý</p>
@@ -1063,10 +1094,10 @@ export default function BuildingDetailPage() {
                       <p className="text-muted-foreground font-medium">Mã QR Thanh toán (Của tòa nhà)</p>
                       <img src={building.payment_qr_code} alt="QR Code Tòa nhà" className="max-h-40 object-contain border rounded-lg p-2" />
                     </div>
-                  ) : building.owner?.payment_qr_code ? (
+                  ) : building.owners?.find(o => o.payment_qr_code)?.payment_qr_code ? (
                     <div className="space-y-1 md:col-span-2">
-                      <p className="text-muted-foreground font-medium">Mã QR Thanh toán (Mặc định từ Chủ nhà)</p>
-                      <img src={building.owner.payment_qr_code} alt="QR Code Chủ nhà" className="max-h-40 object-contain border rounded-lg p-2 opacity-80" />
+                      <p className="text-muted-foreground font-medium">Mã QR Thanh toán (Từ Chủ nhà đầu tiên có QR)</p>
+                      <img src={building.owners.find(o => o.payment_qr_code)?.payment_qr_code} alt="QR Code Chủ nhà" className="max-h-40 object-contain border rounded-lg p-2 opacity-80" />
                     </div>
                   ) : null}
                 </div>

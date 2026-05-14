@@ -65,6 +65,11 @@ interface RevenueStatsData {
     otherIncome: number;
     otherExpense: number;
   };
+  detailedBreakdown?: Array<{
+    name: string;
+    type: "INCOME" | "EXPENSE";
+    amount: number;
+  }>;
   chartData: Array<{
     period: string;
     revenue: number;
@@ -310,21 +315,25 @@ export function RevenueStatistics() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[
-                    { name: "Thu hóa đơn", type: "INCOME", amount: (data.breakdown || { invoicesRevenue: 0 }).invoicesRevenue },
-                    { name: "Thu cọc", type: "INCOME", amount: (data.breakdown || { depositsRevenue: 0 }).depositsRevenue },
-                    { name: "Hoàn cọc", type: "EXPENSE", amount: (data.breakdown || { refundExpenses: 0 }).refundExpenses },
-                    { name: "Sửa chữa bảo trì", type: "EXPENSE", amount: (data.breakdown || { maintenanceExpenses: 0 }).maintenanceExpenses },
-                    { name: "Thu khác (Thu chi)", type: "INCOME", amount: (data.breakdown || { otherIncome: 0 }).otherIncome },
-                    { name: "Chi khác (Thu chi)", type: "EXPENSE", amount: (data.breakdown || { otherExpense: 0 }).otherExpense },
-                  ]
+                  {(data.detailedBreakdown && data.detailedBreakdown.length > 0
+                    ? data.detailedBreakdown
+                    : [
+                        { name: "Thu hóa đơn", type: "INCOME", amount: (data.breakdown || { invoicesRevenue: 0 }).invoicesRevenue },
+                        { name: "Thu cọc", type: "INCOME", amount: (data.breakdown || { depositsRevenue: 0 }).depositsRevenue },
+                        { name: "Hoàn cọc", type: "EXPENSE", amount: (data.breakdown || { refundExpenses: 0 }).refundExpenses },
+                        { name: "Sửa chữa bảo trì", type: "EXPENSE", amount: (data.breakdown || { maintenanceExpenses: 0 }).maintenanceExpenses },
+                        { name: "Thu khác (Thu chi)", type: "INCOME", amount: (data.breakdown || { otherIncome: 0 }).otherIncome },
+                        { name: "Chi khác (Thu chi)", type: "EXPENSE", amount: (data.breakdown || { otherExpense: 0 }).otherExpense },
+                      ]
+                  )
                   .sort((a, b) => {
                     if (a.type !== b.type) return a.type === "INCOME" ? -1 : 1;
                     return b.amount - a.amount;
                   })
                   .map((item, idx) => {
                     const totalForType = item.type === "INCOME" ? data.aggregate.totalRevenue : data.aggregate.totalExpense;
-                    const percentage = totalForType > 0 ? Math.round((item.amount / totalForType) * 100) : 0;
+                    const percentage = totalForType > 0 ? (item.amount / totalForType) * 100 : 0;
+                    const formattedPercentage = percentage > 0 && percentage < 1 ? percentage.toFixed(1) : Math.round(percentage);
                     
                     return (
                       <TableRow key={idx}>
@@ -338,7 +347,7 @@ export function RevenueStatistics() {
                         </TableCell>
                         <TableCell className="text-right">{formatCompactCurrency(item.amount)}</TableCell>
                         <TableCell className="text-right text-muted-foreground text-sm">
-                          {percentage}%
+                          {formattedPercentage}%
                         </TableCell>
                       </TableRow>
                     );

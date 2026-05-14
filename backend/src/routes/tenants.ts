@@ -1,4 +1,5 @@
 import { Router, Response } from "express";
+import { In } from "typeorm";
 import { AppDataSource } from "../data-source";
 import { Tenant } from "../entities/Tenant";
 import { Contract, ContractStatus } from "../entities/Contract";
@@ -401,7 +402,16 @@ globalTenantRouter.get("/", async (req: AuthRequest, res: Response) => {
     if (role === UserRole.ADMIN) {
       if (building_id) allowedBuildingIds = [building_id as string];
     } else if (role === UserRole.OWNER) {
-      const buildings = await buildingRepo().find({ where: { owner_id: id } });
+      const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+      const ownerships = await ownerRepo.find({ where: { owner_id: id } });
+      const ids = ownerships.map((o: any) => o.building_id);
+      
+      let buildings;
+      if (ids.length > 0) {
+        buildings = await buildingRepo().find({ where: [ { id: In(ids) }, { owner_id: id } ] });
+      } else {
+        buildings = await buildingRepo().find({ where: { owner_id: id } });
+      }
       allowedBuildingIds = buildings.map(b => b.id);
       if (building_id && allowedBuildingIds.includes(building_id as string)) {
         allowedBuildingIds = [building_id as string];

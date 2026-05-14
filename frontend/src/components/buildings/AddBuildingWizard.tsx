@@ -29,10 +29,11 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
   // User & assignment state
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [usersList, setUsersList] = useState<any[]>([]);
-  const [ownerId, setOwnerId] = useState("");
+  const [ownerIds, setOwnerIds] = useState<string[]>([]);
   const [managerIds, setManagerIds] = useState<string[]>([]);
   
   // Search states
+  const [ownerSearch, setOwnerSearch] = useState("");
   const [managerSearch, setManagerSearch] = useState("");
   
   // Form state
@@ -101,7 +102,7 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
       setDistrictId("");
       setWard("");
       setAddress("");
-      setOwnerId("");
+      setOwnerIds([]);
       setManagerIds([]);
       setPaymentQrCode("");
       setSelecting("none");
@@ -140,6 +141,10 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
   }, [open]);
 
   const owners = usersList.filter(u => u.role === "ADMIN" || u.role === "OWNER");
+  const filteredOwners = owners.filter(o => 
+    o.name.toLowerCase().includes(ownerSearch.toLowerCase()) || 
+    (o.phone && o.phone.includes(ownerSearch))
+  );
   const managers = usersList.filter(u => u.role === "MANAGER");
 
 
@@ -398,7 +403,7 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
             default_base_rent: parseInt(rc.default_base_rent.replace(/\D/g, "") || "0")
           })),
           floors: generatedFloors,
-          owner_id: ownerId || undefined,
+          owner_ids: ownerIds,
           manager_ids: managerIds,
           payment_qr_code: paymentQrCode || undefined,
           lease_start_date: leaseStartDate || undefined,
@@ -589,20 +594,38 @@ export function AddBuildingWizard({ open, onOpenChange, onSuccess }: AddBuilding
 
                 <div className="space-y-4">
                   {currentUserRole === "ADMIN" && (
-                    <div className="space-y-2 relative">
+                    <div className="space-y-2">
                       <Label className="text-sm font-normal text-foreground">Chủ nhà <span className="text-red-500">*</span></Label>
-                      <SearchableSelect
-                        options={owners.map(o => ({
-                          value: o.id,
-                          label: `${o.name} - ${o.phone}`
-                        }))}
-                        value={ownerId}
-                        onValueChange={(v) => setOwnerId(v)}
-                        placeholder="Chọn chủ nhà"
-                        searchPlaceholder="Tìm chủ nhà (tên, sđt)..."
-                        emptyMessage="Không tìm thấy chủ nhà"
-                        className="bg-background rounded-xl h-12"
-                      />
+                      <div className="bg-background rounded-xl border border-border overflow-hidden">
+                        <div className="p-2 border-b border-border bg-muted/50">
+                          <Input 
+                            placeholder="Tìm chủ nhà (tên, sđt)..." 
+                            value={ownerSearch}
+                            onChange={(e) => setOwnerSearch(e.target.value)}
+                            className="h-9 bg-background"
+                          />
+                        </div>
+                        <div className="p-3 space-y-2 max-h-48 overflow-y-auto">
+                          {filteredOwners.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Chưa có chủ nhà nào phù hợp</p>
+                          ) : (
+                            filteredOwners.map(o => (
+                              <label key={o.id} className="flex items-center space-x-2 p-1 hover:bg-muted rounded cursor-pointer">
+                                <input 
+                                  type="checkbox" 
+                                  checked={ownerIds.includes(o.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setOwnerIds([...ownerIds, o.id]);
+                                    else setOwnerIds(ownerIds.filter(id => id !== o.id));
+                                  }}
+                                  className="rounded border-border text-primary focus:ring-primary w-4 h-4"
+                                />
+                                <span className="text-sm">{o.name} - {o.phone}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 

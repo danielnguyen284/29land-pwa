@@ -235,8 +235,8 @@ export default function DashboardPage() {
                   {isRevenueVisible ? <Eye className="w-4 h-4 md:w-5 md:h-5"/> : <EyeOff className="w-4 h-4 md:w-5 md:h-5"/>}
                 </div>
                 <div className="pt-0.5">
-                  <p className="text-sm md:text-base font-bold leading-none">Doanh thu tháng</p>
-                  <p className="text-[11px] md:text-xs text-muted-foreground mt-1 leading-tight">{formatPeriod(period)}</p>
+                  <p className="text-sm md:text-base font-bold leading-none">Tổng doanh thu</p>
+                  <p className="text-[11px] md:text-xs text-muted-foreground mt-1 leading-tight">Toàn hệ thống</p>
                 </div>
               </div>
               <div className="flex justify-between items-end mt-2">

@@ -35,7 +35,22 @@ async function getAccessibleBuildingIds(user: NonNullable<AuthRequest["user"]>, 
     const buildings = await buildingRepo().find({ select: ["id"] });
     accessibleIds = buildings.map((b) => b.id);
   } else if (user.role === UserRole.OWNER) {
-    const buildings = await buildingRepo().find({ where: { owner_id: user.id }, select: ["id"] });
+    const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+    const ownerships = await ownerRepo.find({ where: { owner_id: user.id } });
+    const ids = ownerships.map((o: any) => o.building_id);
+    
+    let buildings;
+    if (ids.length > 0) {
+      buildings = await buildingRepo().find({ 
+        where: [ { id: In(ids) }, { owner_id: user.id } ], 
+        select: ["id"] 
+      });
+    } else {
+      buildings = await buildingRepo().find({ 
+        where: { owner_id: user.id }, 
+        select: ["id"] 
+      });
+    }
     accessibleIds = buildings.map((b) => b.id);
   } else if (user.role === UserRole.MANAGER) {
     const assignments = await managerRepo().find({ where: { manager_id: user.id } });
@@ -85,92 +100,80 @@ router.get("/dashboard", requireRole(UserRole.ADMIN, UserRole.OWNER, UserRole.MA
     const occupiedRooms = rooms.filter((r) => r.status === RoomStatus.OCCUPIED).length;
     const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
 
-    // 2. Revenue & Debt
-    const invoices = await invoiceRepo()
+    // 2. Revenue (All time)
+    const invoiceSum = await invoiceRepo()
       .createQueryBuilder("inv")
       .innerJoin("inv.room", "r")
       .innerJoin("r.floor", "f")
       .where("f.building_id IN (:...buildingIds)", { buildingIds })
-      .andWhere("inv.billing_period = :period", { period: targetPeriod })
-      .getMany();
+      .select("SUM(inv.total_amount)", "expected")
+      .addSelect("SUM(inv.paid_amount)", "collected")
+      .getRawOne();
 
-    let expectedRevenue = 0;
-    let collectedRevenue = 0;
-    
-    for (const inv of invoices) {
-      expectedRevenue += Number(inv.total_amount);
-      collectedRevenue += Number(inv.paid_amount);
-    }
+    let expectedRevenue = Number(invoiceSum?.expected || 0);
+    let collectedRevenue = Number(invoiceSum?.collected || 0);
 
-    // Add deposits from new contracts in this period to revenue
-    const newContractsInPeriod = await contractRepo()
+    // Add deposits from all contracts to revenue
+    const contractSum = await contractRepo()
       .createQueryBuilder("c")
       .innerJoin("c.room", "r")
       .innerJoin("r.floor", "f")
       .where("f.building_id IN (:...buildingIds)", { buildingIds })
-      .andWhere("CAST(c.start_date AS TEXT) LIKE :period", { period: `${targetPeriod}%` })
-      .getMany();
+      .select("SUM(c.deposit_amount)", "deposit")
+      .getRawOne();
 
-    for (const c of newContractsInPeriod) {
-      expectedRevenue += Number(c.deposit_amount);
-      collectedRevenue += Number(c.deposit_amount);
-    }
+    expectedRevenue += Number(contractSum?.deposit || 0);
+    collectedRevenue += Number(contractSum?.deposit || 0);
 
-    const outstandingDebt = expectedRevenue - collectedRevenue;
-
-    // 3. Expenses (Approved ticket expenses in the given month)
-    // To filter by month, we check the created_at of the expense
-    const startDate = new Date(`${targetPeriod}-01T00:00:00.000Z`);
-    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
-
-    const expenses = await expenseRepo()
+    // 3. Expenses (All time)
+    const expenseSum = await expenseRepo()
       .createQueryBuilder("e")
       .innerJoin("e.ticket", "t")
       .innerJoin("t.room", "r")
       .innerJoin("r.floor", "f")
       .where("f.building_id IN (:...buildingIds)", { buildingIds })
       .andWhere("e.status = :status", { status: ExpenseStatus.APPROVED })
-      .andWhere("e.created_at >= :startDate AND e.created_at < :endDate", { startDate, endDate })
-      .getMany();
+      .select("SUM(e.amount)", "total")
+      .getRawOne();
 
-    let totalExpenses = 0;
-    for (const exp of expenses) {
-      totalExpenses += Number(exp.amount);
-    }
+    let totalExpenses = Number(expenseSum?.total || 0);
 
-    // Add refunded deposits from terminated contracts in this period to expenses
-    const terminatedContractsInPeriod = await contractRepo()
+    // Add refunded deposits from all terminated contracts to expenses
+    const refundedDepositSum = await contractRepo()
       .createQueryBuilder("c")
       .innerJoin("c.room", "r")
       .innerJoin("r.floor", "f")
       .where("f.building_id IN (:...buildingIds)", { buildingIds })
       .andWhere("c.status = :status", { status: ContractStatus.TERMINATED })
-      .andWhere("CAST(c.actual_end_date AS TEXT) LIKE :period", { period: `${targetPeriod}%` })
-      .getMany();
+      .select("SUM(c.refunded_deposit)", "refunded")
+      .getRawOne();
 
-    for (const c of terminatedContractsInPeriod) {
-      if (c.refunded_deposit !== null) {
-        totalExpenses += Number(c.refunded_deposit);
-      }
-    }
+    totalExpenses += Number(refundedDepositSum?.refunded || 0);
 
-    // 4. Other Transactions (Income/Expense)
-    const transactions = await transactionRepo()
+    // 4. Other Transactions (Income/Expense) (All time)
+    const transactionSums = await transactionRepo()
       .createQueryBuilder("tr")
       .where("tr.building_id IN (:...buildingIds)", { buildingIds })
-      .andWhere("tr.accounting_period = :period", { period: targetPeriod })
-      .getMany();
+      .select("tr.type", "type")
+      .addSelect("SUM(tr.amount)", "amount")
+      .groupBy("tr.type")
+      .getRawMany();
 
-    for (const tr of transactions) {
+    for (const tr of transactionSums) {
       if (tr.type === TransactionType.EXPENSE) {
-        totalExpenses += Number(tr.amount);
+        totalExpenses += Number(tr.amount || 0);
       } else if (tr.type === TransactionType.INCOME) {
-        expectedRevenue += Number(tr.amount);
-        collectedRevenue += Number(tr.amount);
+        expectedRevenue += Number(tr.amount || 0);
+        collectedRevenue += Number(tr.amount || 0);
       }
     }
 
+    const outstandingDebt = expectedRevenue - collectedRevenue;
+
     // 5. Maintenance Tickets (Created in the period)
+    const startDate = new Date(`${targetPeriod}-01T00:00:00.000Z`);
+    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
+
     const tickets = await ticketRepo()
       .createQueryBuilder("t")
       .innerJoin("t.room", "r")
@@ -283,6 +286,9 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
     let otherIncome = 0;
     let otherExpense = 0;
 
+    const invoiceItemsMap = new Map<string, number>();
+    const transactionCategoriesMap = new Map<string, { type: "INCOME" | "EXPENSE", amount: number }>();
+
     // Generate month buckets between start and end
     const chartDataMap = new Map<string, { period: string; revenue: number; expense: number; profit: number }>();
     
@@ -304,6 +310,7 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
     // 1. Invoices
     const invoices = await invoiceRepo()
       .createQueryBuilder("inv")
+      .leftJoinAndSelect("inv.items", "item")
       .innerJoin("inv.room", "r")
       .innerJoin("r.floor", "f")
       .where("f.building_id IN (:...buildingIds)", { buildingIds: targetBuildingIds })
@@ -316,6 +323,24 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
       if (bucket) {
         bucket.revenue += Number(inv.paid_amount);
         invoicesRevenue += Number(inv.paid_amount);
+      }
+      
+      if (queryBuildingIds && queryBuildingIds.length === 1) {
+        const totalAmt = Number(inv.total_amount);
+        const paidAmt = Number(inv.paid_amount);
+        const ratio = totalAmt > 0 ? paidAmt / totalAmt : 0;
+        
+        if (inv.items && inv.items.length > 0) {
+          inv.items.forEach(item => {
+            let name = item.description || "Tiền phòng";
+            // Clean description to group by service type (e.g., "Nước: 1 -> 3 = 2 x 25,000" becomes "Nước")
+            if (name.includes(":") && (name.includes("→") || name.includes("->") || name.includes("="))) {
+              name = name.split(":")[0].trim();
+            }
+            const itemPaid = Number(item.amount) * ratio;
+            invoiceItemsMap.set(name, (invoiceItemsMap.get(name) || 0) + itemPaid);
+          });
+        }
       }
     });
 
@@ -384,6 +409,7 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
     
     const transactions = await transactionRepo()
       .createQueryBuilder("tr")
+      .leftJoinAndSelect("tr.category", "cat")
       .where("tr.building_id IN (:...buildingIds)", { buildingIds: targetBuildingIds })
       .andWhere("tr.accounting_period >= :startPeriod AND tr.accounting_period <= :endPeriod", { 
         startPeriod: transactionStartPeriod, 
@@ -401,6 +427,13 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
           bucket.expense += Number(tr.amount);
           otherExpense += Number(tr.amount);
         }
+      }
+
+      if (queryBuildingIds && queryBuildingIds.length === 1) {
+        const catName = tr.category?.name || (tr.type === TransactionType.INCOME ? "Thu khác" : "Chi khác");
+        const existing = transactionCategoriesMap.get(catName) || { type: tr.type as "INCOME" | "EXPENSE", amount: 0 };
+        existing.amount += Number(tr.amount);
+        transactionCategoriesMap.set(catName, existing);
       }
     });
 
@@ -434,6 +467,26 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
       .andWhere("t.status = :status", { status: "ACTIVE" })
       .getCount();
 
+    const detailedBreakdown: Array<{name: string, type: string, amount: number}> = [];
+
+    if (queryBuildingIds && queryBuildingIds.length === 1) {
+       for (const [name, amount] of invoiceItemsMap.entries()) {
+          detailedBreakdown.push({ name, type: "INCOME", amount });
+       }
+       if (depositsRevenue > 0) {
+          detailedBreakdown.push({ name: "Thu cọc", type: "INCOME", amount: depositsRevenue });
+       }
+       if (refundExpenses > 0) {
+          detailedBreakdown.push({ name: "Hoàn cọc", type: "EXPENSE", amount: refundExpenses });
+       }
+       if (maintenanceExpenses > 0) {
+          detailedBreakdown.push({ name: "Chi phí bảo trì", type: "EXPENSE", amount: maintenanceExpenses });
+       }
+       for (const [name, data] of transactionCategoriesMap.entries()) {
+          detailedBreakdown.push({ name, type: data.type, amount: data.amount });
+       }
+    }
+
     res.json({
       aggregate: {
         totalRevenue,
@@ -450,6 +503,7 @@ router.get("/revenue-stats", requireRole(UserRole.ADMIN, UserRole.OWNER), async 
         otherIncome,
         otherExpense
       },
+      detailedBreakdown,
       chartData
     });
   } catch (error) {

@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from "express";
 import { AppDataSource } from "../data-source";
 import { Building } from "../entities/Building";
 import { BuildingManager } from "../entities/BuildingManager";
+import { BuildingOwner } from "../entities/BuildingOwner";
 import { RoomClass } from "../entities/RoomClass";
 import { Floor } from "../entities/Floor";
 import { Room } from "../entities/Room";
@@ -13,6 +14,7 @@ import { In, ILike } from "typeorm";
 const router = Router();
 const buildingRepo = () => AppDataSource.getRepository(Building);
 const managerRepo = () => AppDataSource.getRepository(BuildingManager);
+const ownerRepo = () => AppDataSource.getRepository(BuildingOwner);
 const classRepo = () => AppDataSource.getRepository(RoomClass);
 const floorRepo = () => AppDataSource.getRepository(Floor);
 
@@ -24,7 +26,8 @@ const requireBuildingOwnership = async (req: AuthRequest, res: Response, next: N
   if (req.user!.role === UserRole.OWNER) {
     const building = await buildingRepo().findOneBy({ id: req.params.id as string });
     if (!building) { res.status(404).json({ message: "Không tìm thấy tòa nhà" }); return; }
-    if (building.owner_id !== req.user!.id) { res.status(403).json({ message: "Không có quyền" }); return; }
+    const ownership = await ownerRepo().findOneBy({ building_id: building.id, owner_id: req.user!.id });
+    if (!ownership && building.owner_id !== req.user!.id) { res.status(403).json({ message: "Không có quyền" }); return; }
     return next();
   }
   res.status(403).json({ message: "Không có quyền" });
@@ -46,7 +49,16 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     if (role === UserRole.ADMIN) {
       whereClause = {};
     } else if (role === UserRole.OWNER) {
-      whereClause = { owner_id: id };
+      const ownerships = await ownerRepo().find({ where: { owner_id: id } });
+      const ids = ownerships.map((o) => o.building_id);
+      if (ids.length > 0) {
+        whereClause = [
+          { id: In(ids), ...(search ? { name: ILike(`%${search}%`) } : {}) },
+          { owner_id: id, ...(search ? { name: ILike(`%${search}%`) } : {}) }
+        ];
+      } else {
+        whereClause = { owner_id: id, ...(search ? { name: ILike(`%${search}%`) } : {}) };
+      }
     } else if (role === UserRole.MANAGER) {
       const assignments = await managerRepo().find({ where: { manager_id: id } });
       const ids = assignments.map((a) => a.building_id);
@@ -60,13 +72,12 @@ router.get("/", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (search) {
+    if (search && role !== UserRole.OWNER) {
       whereClause.name = ILike(`%${search}%`);
     }
 
     const [buildings, total] = await buildingRepo().findAndCount({
       where: whereClause,
-      relations: ["owner"],
       order: { created_at: "DESC" },
       skip,
       take: limit
@@ -85,9 +96,24 @@ router.get("/", async (req: AuthRequest, res: Response) => {
       const countMap = new Map();
       roomCounts.forEach((row: any) => countMap.set(row.building_id, parseInt(row.count, 10)));
       
+      const ownerships = await ownerRepo().find({ where: { building_id: In(buildings.map(b => b.id)) }, relations: ["owner"] });
+      const ownersMap = new Map<string, any[]>();
+      ownerships.forEach(o => {
+        if (!ownersMap.has(o.building_id)) ownersMap.set(o.building_id, []);
+        ownersMap.get(o.building_id)!.push({ id: o.owner.id, name: o.owner.name, phone: o.owner.phone, payment_qr_code: o.owner.payment_qr_code });
+      });
+
       const result = buildings.map(b => {
+        let owners = ownersMap.get(b.id) || [];
+        // Fallback for old owner_id
+        if (owners.length === 0 && b.owner_id) {
+          // It's a list view, so we don't fully fetch old owner details to avoid N+1 if not populated
+          // But it's fine for now, we just pass what we can or leave it. We will fetch if needed.
+        }
+        
         const item = {
           ...b,
+          owners,
           rooms_count: countMap.get(b.id) || 0
         };
         if (role !== UserRole.ADMIN && role !== UserRole.OWNER) {
@@ -120,13 +146,24 @@ router.post("/", requireRole(UserRole.ADMIN), async (req: AuthRequest, res: Resp
     const { 
       name, address, province, district, ward, 
       invoice_closing_date, payment_deadline_date, building_type, description,
-      fee_configs, owner_id, manager_ids, floors, room_classes, payment_qr_code,
+      fee_configs, owner_id, owner_ids, manager_ids, floors, room_classes, payment_qr_code,
       lease_start_date, lease_term_years
     } = req.body;
     if (!name) { res.status(400).json({ message: "Tên tòa nhà là bắt buộc" }); return; }
 
     await AppDataSource.transaction(async (transactionalEntityManager) => {
-      const actualOwnerId = req.user!.role === UserRole.ADMIN ? (owner_id || req.user!.id) : req.user!.id;
+      let actualOwnerIds: string[] = [];
+      if (req.user!.role === UserRole.ADMIN) {
+        if (owner_ids && Array.isArray(owner_ids) && owner_ids.length > 0) {
+          actualOwnerIds = owner_ids;
+        } else if (owner_id) {
+          actualOwnerIds = [owner_id];
+        } else {
+          actualOwnerIds = [req.user!.id];
+        }
+      } else {
+        actualOwnerIds = [req.user!.id];
+      }
 
       const building = transactionalEntityManager.create(Building, {
         name,
@@ -134,7 +171,7 @@ router.post("/", requireRole(UserRole.ADMIN), async (req: AuthRequest, res: Resp
         province,
         district,
         ward,
-        owner_id: actualOwnerId,
+        owner_id: actualOwnerIds[0],
         invoice_closing_date: invoice_closing_date || 1,
         payment_deadline_date: payment_deadline_date || null,
         building_type: building_type || null,
@@ -146,6 +183,14 @@ router.post("/", requireRole(UserRole.ADMIN), async (req: AuthRequest, res: Resp
       });
 
       const savedBuilding = await transactionalEntityManager.save(building);
+
+      for (const oid of actualOwnerIds) {
+        const ownership = transactionalEntityManager.create(BuildingOwner, {
+          building_id: savedBuilding.id,
+          owner_id: oid,
+        });
+        await transactionalEntityManager.save(ownership);
+      }
 
       if (manager_ids && Array.isArray(manager_ids)) {
         for (const manager_id of manager_ids) {
@@ -213,10 +258,21 @@ router.post("/", requireRole(UserRole.ADMIN), async (req: AuthRequest, res: Resp
 router.get("/:id", requireBuildingAccess, async (req: AuthRequest, res: Response) => {
   try {
     const building = await buildingRepo().findOne({
-      where: { id: req.params.id as string },
-      relations: ["owner"],
+      where: { id: req.params.id as string }
     });
     if (!building) { res.status(404).json({ message: "Không tìm thấy tòa nhà" }); return; }
+
+    const ownerships = await ownerRepo().find({ where: { building_id: building.id }, relations: ["owner"] });
+    let owners: { id: string; name: string; phone: string; payment_qr_code?: string }[] = [];
+    if (ownerships.length > 0) {
+      owners = ownerships.map(o => ({ id: o.owner.id, name: o.owner.name, phone: o.owner.phone, payment_qr_code: o.owner.payment_qr_code }));
+    } else if (building.owner_id) {
+      const userRepo = AppDataSource.getRepository(User);
+      const oldOwner = await userRepo.findOneBy({ id: building.owner_id });
+      if (oldOwner) {
+        owners = [{ id: oldOwner.id, name: oldOwner.name, phone: oldOwner.phone, payment_qr_code: oldOwner.payment_qr_code }];
+      }
+    }
 
     // Fetch managers via pivot table
     const assignments = await managerRepo().find({ where: { building_id: building.id } });
@@ -233,7 +289,7 @@ router.get("/:id", requireBuildingAccess, async (req: AuthRequest, res: Response
       delete (building as any).lease_term_years;
     }
 
-    res.json({ ...building, managers });
+    res.json({ ...building, managers, owners });
   } catch (error) {
     console.error("Get building error:", error);
     res.status(500).json({ message: "Lỗi hệ thống" });
@@ -264,9 +320,15 @@ router.patch("/:id", requireRole(UserRole.ADMIN, UserRole.OWNER), requireBuildin
     const building = await buildingRepo().findOneBy({ id: req.params.id as string });
     if (!building) { res.status(404).json({ message: "Không tìm thấy tòa nhà" }); return; }
 
-    const { name, address, province, district, ward, invoice_closing_date, fee_configs, payment_qr_code, owner_id, manager_ids } = req.body;
+    const { name, address, province, district, ward, invoice_closing_date, fee_configs, payment_qr_code, owner_id, owner_ids, manager_ids } = req.body;
     
-    if (req.user!.role === UserRole.ADMIN && owner_id !== undefined) building.owner_id = owner_id;
+    if (req.user!.role === UserRole.ADMIN) {
+      if (owner_ids && Array.isArray(owner_ids) && owner_ids.length > 0) {
+        building.owner_id = owner_ids[0];
+      } else if (owner_id !== undefined) {
+        building.owner_id = owner_id;
+      }
+    }
 
     if (req.body.name !== undefined) building.name = req.body.name;
     if (req.body.address !== undefined) building.address = req.body.address;
@@ -279,11 +341,22 @@ router.patch("/:id", requireRole(UserRole.ADMIN, UserRole.OWNER), requireBuildin
     if (req.body.description !== undefined) building.description = req.body.description;
     if (req.body.fee_configs !== undefined) building.fee_configs = req.body.fee_configs;
     if (payment_qr_code !== undefined) building.payment_qr_code = payment_qr_code;
-    if (req.body.lease_start_date !== undefined) building.lease_start_date = req.body.lease_start_date;
-    if (req.body.lease_term_years !== undefined) building.lease_term_years = req.body.lease_term_years;
+    if (req.body.lease_start_date !== undefined) building.lease_start_date = req.body.lease_start_date === "" ? null : req.body.lease_start_date;
+    if (req.body.lease_term_years !== undefined) building.lease_term_years = req.body.lease_term_years === "" ? null : req.body.lease_term_years;
 
     await AppDataSource.transaction(async (transactionalEntityManager) => {
       await transactionalEntityManager.save(building);
+
+      if (req.user!.role === UserRole.ADMIN && owner_ids && Array.isArray(owner_ids)) {
+        await transactionalEntityManager.delete(BuildingOwner, { building_id: building.id });
+        for (const oid of owner_ids) {
+          const ownership = transactionalEntityManager.create(BuildingOwner, {
+            building_id: building.id,
+            owner_id: oid,
+          });
+          await transactionalEntityManager.save(ownership);
+        }
+      }
 
       if (manager_ids && Array.isArray(manager_ids)) {
         await transactionalEntityManager.delete(BuildingManager, { building_id: building.id });

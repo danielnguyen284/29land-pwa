@@ -60,9 +60,16 @@ export const syncExpiredContracts = async () => {
           const title = "Hợp đồng tự động gia hạn";
           const content = `Hợp đồng phòng ${contract.room.name} (${building.name}) đã được tự động gia hạn thêm ${contract.auto_renew_months} tháng. Hạn mới: ${newEndDateString}`;
           
-          // 1. Notify Owner
-          if (building.owner_id) {
-            await createNotification(building.owner_id, title, content, NotificationType.CONTRACT_RENEWED, { 
+          // 1. Notify Owners
+          const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+          const ownerships = await ownerRepo.find({ where: { building_id: building.id } });
+          
+          const notifyOwnerIds = new Set<string>();
+          if (building.owner_id) notifyOwnerIds.add(building.owner_id);
+          ownerships.forEach((o: any) => notifyOwnerIds.add(o.owner_id));
+          
+          for (const oid of notifyOwnerIds) {
+            await createNotification(oid, title, content, NotificationType.CONTRACT_RENEWED, { 
               url: `/contracts/${contract.id}`,
               contract_id: contract.id 
             });

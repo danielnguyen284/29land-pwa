@@ -1,4 +1,5 @@
 import { Router, Response } from "express";
+import { In } from "typeorm";
 import { AppDataSource } from "../data-source";
 import { Contract } from "../entities/Contract";
 import { Building } from "../entities/Building";
@@ -30,7 +31,16 @@ router.get("/", async (req: AuthRequest, res: Response) => {
         allowedBuildingIds = [building_id as string];
       }
     } else if (role === UserRole.OWNER) {
-      const buildings = await buildingRepo().find({ where: { owner_id: id } });
+      const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+      const ownerships = await ownerRepo.find({ where: { owner_id: id } });
+      const ids = ownerships.map((o: any) => o.building_id);
+      
+      let buildings;
+      if (ids.length > 0) {
+        buildings = await buildingRepo().find({ where: [ { id: In(ids) }, { owner_id: id } ] });
+      } else {
+        buildings = await buildingRepo().find({ where: { owner_id: id } });
+      }
       allowedBuildingIds = buildings.map(b => b.id);
       if (building_id && allowedBuildingIds.includes(building_id as string)) {
         allowedBuildingIds = [building_id as string];
@@ -106,8 +116,12 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
     const buildingId = contract.room.floor.building_id;
 
     if (role === UserRole.OWNER) {
-      const building = await buildingRepo().findOne({ where: { id: buildingId, owner_id: id } });
-      if (!building) return res.status(403).json({ message: "Bạn không có quyền xem hợp đồng này" });
+      const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+      const ownership = await ownerRepo.findOneBy({ building_id: buildingId, owner_id: id });
+      const building = await buildingRepo().findOneBy({ id: buildingId });
+      if (!building || (!ownership && building.owner_id !== id)) {
+        return res.status(403).json({ message: "Bạn không có quyền xem hợp đồng này" });
+      }
     } else if (role === UserRole.MANAGER) {
       const assignment = await managerRepo().findOne({ where: { manager_id: id, building_id: buildingId } });
       if (!assignment) return res.status(403).json({ message: "Bạn không có quyền xem hợp đồng này" });
@@ -140,8 +154,12 @@ router.patch("/:id/notice-to-move", async (req: AuthRequest, res: Response) => {
     const buildingId = contract.room.floor.building_id;
 
     if (role === UserRole.OWNER) {
-      const building = await buildingRepo().findOne({ where: { id: buildingId, owner_id: userId } });
-      if (!building) return res.status(403).json({ message: "Không có quyền" });
+      const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+      const ownership = await ownerRepo.findOneBy({ building_id: buildingId, owner_id: userId });
+      const building = await buildingRepo().findOneBy({ id: buildingId });
+      if (!building || (!ownership && building.owner_id !== userId)) {
+        return res.status(403).json({ message: "Không có quyền" });
+      }
     } else if (role === UserRole.MANAGER) {
       const assignment = await managerRepo().findOne({ where: { manager_id: userId, building_id: buildingId } });
       if (!assignment) return res.status(403).json({ message: "Không có quyền" });

@@ -29,7 +29,14 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     const { role, id } = req.user!;
 
     if (role === UserRole.OWNER) {
-      qb.andWhere("building.owner_id = :ownerId", { ownerId: id });
+      const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+      const ownerships = await ownerRepo.find({ where: { owner_id: id } });
+      const buildingIds = ownerships.map((o: any) => o.building_id);
+      if (buildingIds.length > 0) {
+        qb.andWhere("(building.id IN (:...buildingIds) OR building.owner_id = :ownerId)", { buildingIds, ownerId: id });
+      } else {
+        qb.andWhere("building.owner_id = :ownerId", { ownerId: id });
+      }
     } else if (role === UserRole.MANAGER) {
       const managerRepo = AppDataSource.getRepository("BuildingManager");
       const assignments = await managerRepo.find({ where: { manager_id: id } });
@@ -76,7 +83,9 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
     if (req.user!.role === UserRole.OWNER) {
       const buildingRepo = AppDataSource.getRepository(Building);
       const building = await buildingRepo.findOneBy({ id: room.floor.building_id });
-      if (!building || building.owner_id !== req.user!.id) {
+      const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+      const ownership = await ownerRepo.findOneBy({ building_id: room.floor.building_id, owner_id: req.user!.id });
+      if (!building || (!ownership && building.owner_id !== req.user!.id)) {
         res.status(403).json({ message: "Không có quyền xem phòng này" });
         return;
       }
@@ -115,9 +124,13 @@ router.post("/", requireRole(UserRole.ADMIN, UserRole.OWNER), async (req: AuthRe
     const building = await buildingRepo.findOneBy({ id: floor.building_id });
     if (!building) { res.status(404).json({ message: "Không tìm thấy tòa nhà" }); return; }
 
-    if (req.user!.role === UserRole.OWNER && building.owner_id !== req.user!.id) {
-      res.status(403).json({ message: "Không có quyền tạo phòng ở tòa nhà này" });
-      return;
+    if (req.user!.role === UserRole.OWNER) {
+      const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+      const ownership = await ownerRepo.findOneBy({ building_id: building.id, owner_id: req.user!.id });
+      if (!ownership && building.owner_id !== req.user!.id) {
+        res.status(403).json({ message: "Không có quyền tạo phòng ở tòa nhà này" });
+        return;
+      }
     }
 
     let rent = base_rent || 0;
@@ -169,9 +182,13 @@ router.patch("/:id", requireRole(UserRole.ADMIN, UserRole.OWNER), async (req: Au
     if (req.user!.role === UserRole.OWNER) {
       const buildingRepo = AppDataSource.getRepository(Building);
       const building = await buildingRepo.findOneBy({ id: room.floor.building_id });
-      if (building && building.owner_id !== req.user!.id) {
-        res.status(403).json({ message: "Không có quyền sửa phòng này" });
-        return;
+      if (building) {
+        const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+        const ownership = await ownerRepo.findOneBy({ building_id: building.id, owner_id: req.user!.id });
+        if (!ownership && building.owner_id !== req.user!.id) {
+          res.status(403).json({ message: "Không có quyền sửa phòng này" });
+          return;
+        }
       }
     }
 
@@ -203,9 +220,13 @@ router.delete("/:id", requireRole(UserRole.ADMIN, UserRole.OWNER), async (req: A
     if (req.user!.role === UserRole.OWNER) {
       const buildingRepo = AppDataSource.getRepository(Building);
       const building = await buildingRepo.findOneBy({ id: room.floor.building_id });
-      if (building && building.owner_id !== req.user!.id) {
-        res.status(403).json({ message: "Không có quyền xóa phòng này" });
-        return;
+      if (building) {
+        const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+        const ownership = await ownerRepo.findOneBy({ building_id: building.id, owner_id: req.user!.id });
+        if (!ownership && building.owner_id !== req.user!.id) {
+          res.status(403).json({ message: "Không có quyền xóa phòng này" });
+          return;
+        }
       }
     }
     await roomRepo().remove(room);

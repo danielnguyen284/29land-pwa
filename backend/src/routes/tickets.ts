@@ -38,7 +38,14 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     if (role === UserRole.TECHNICIAN) {
       qb.andWhere("t.assigned_tech_id = :techId", { techId: id });
     } else if (role === UserRole.OWNER) {
-      qb.andWhere("building.owner_id = :ownerId", { ownerId: id });
+      const ownerRepo = AppDataSource.getRepository("BuildingOwner");
+      const ownerships = await ownerRepo.find({ where: { owner_id: id } });
+      const buildingIds = ownerships.map((o: any) => o.building_id);
+      if (buildingIds.length > 0) {
+        qb.andWhere("(t.building_id IN (:...buildingIds) OR building.owner_id = :ownerId)", { buildingIds, ownerId: id });
+      } else {
+        qb.andWhere("building.owner_id = :ownerId", { ownerId: id });
+      }
       qb.andWhere("t.status IN (:...visibleStatuses)", { visibleStatuses: [TicketStatus.WAITING_APPROVAL, TicketStatus.COMPLETED] });
     } else if (role === UserRole.MANAGER) {
       const managerRepo = AppDataSource.getRepository("BuildingManager");
